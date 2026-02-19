@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Plus, X, Play, Loader2, MessageSquare, Clock } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
@@ -19,7 +19,8 @@ const PROMPT_TEMPLATES = [
   { category: 'comparison', text: 'Is [brand] better than [competitor]?' },
 ]
 
-const CATEGORY_COLORS: Record<string, string> = {
+// Mapping tipizzato per evitare errori ESLint any
+const CATEGORY_COLORS: Record<string, 'brand' | 'info' | 'warning' | 'success' | 'default'> = {
   awareness: 'brand',
   comparison: 'info',
   alternative: 'warning',
@@ -45,7 +46,7 @@ function PromptCard({
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex-1">
           <div className="mb-1.5 flex flex-wrap gap-1.5">
-            <Badge variant={categoryColor as Parameters<typeof Badge>[0]['variant']}>
+            <Badge variant={categoryColor}>
               {prompt.category ?? 'custom'}
             </Badge>
             <Badge variant="default">{prompt.language}</Badge>
@@ -85,7 +86,7 @@ function PromptCard({
   )
 }
 
-export default function PromptsPage() {
+function PromptsPageContent() {
   const searchParams = useSearchParams()
   const preselectedBrandId = searchParams.get('brand_id')
 
@@ -111,8 +112,8 @@ export default function PromptsPage() {
         fetch('/api/brands'),
         fetch(`/api/prompts${selectedBrandId ? `?brand_id=${selectedBrandId}` : ''}`),
       ])
-      const bJson = (await brandsRes.json()) as { success: boolean; data?: Brand[] }
-      const pJson = (await promptsRes.json()) as { success: boolean; data?: Prompt[] }
+      const bJson = await brandsRes.json()
+      const pJson = await promptsRes.json()
       setBrands(bJson.data ?? [])
       setPrompts(pJson.data ?? [])
     } catch {
@@ -138,7 +139,7 @@ export default function PromptsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, brand_id: selectedBrandId }),
       })
-      const json = (await res.json()) as { success: boolean; data?: Prompt; message?: string }
+      const json = await res.json()
       if (!json.success) throw new Error(json.message)
       setPrompts((prev) => [json.data!, ...prev])
       setShowForm(false)
@@ -159,7 +160,7 @@ export default function PromptsPage() {
 
   const handleDelete = async (id: string) => {
     const res = await fetch(`/api/prompts?id=${id}`, { method: 'DELETE' })
-    const json = (await res.json()) as { success: boolean }
+    const json = await res.json()
     if (json.success) {
       setPrompts((prev) => prev.filter((p) => p.id !== id))
       toast.success('Prompt deleted')
@@ -174,11 +175,7 @@ export default function PromptsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt_id: promptId }),
       })
-      const json = (await res.json()) as {
-        success: boolean
-        data?: { results: unknown[] }
-        message?: string
-      }
+      const json = await res.json()
       if (!json.success) throw new Error(json.message)
       toast.success(`Monitoring complete: ${json.data?.results?.length ?? 0} results saved`)
       void loadData()
@@ -210,7 +207,6 @@ export default function PromptsPage() {
         </Button>
       </div>
 
-      {/* Brand filter */}
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Brand:</span>
@@ -219,7 +215,7 @@ export default function PromptsPage() {
               'rounded-xl border px-3 py-1.5 text-xs font-bold transition-all',
               !selectedBrandId
                 ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
-                : 'border-gray-800 text-gray-500 hover:text-gray-300',
+                : 'border-gray-800 text-gray-500 hover:text-gray-200',
             )}
             onClick={() => setSelectedBrandId('')}
           >
@@ -232,7 +228,7 @@ export default function PromptsPage() {
                 'rounded-xl border px-3 py-1.5 text-xs font-bold transition-all',
                 selectedBrandId === b.id
                   ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
-                  : 'border-gray-800 text-gray-500 hover:text-gray-300',
+                  : 'border-gray-800 text-gray-500 hover:text-gray-200',
               )}
               onClick={() => setSelectedBrandId(b.id)}
             >
@@ -242,12 +238,10 @@ export default function PromptsPage() {
         </div>
       </Card>
 
-      {/* Create form */}
       {showForm && (
         <Card className="animate-in border-brand-500/30 p-6">
           <h2 className="mb-5 text-base font-bold text-white">Create New Prompt</h2>
           <div className="space-y-4">
-            {/* Brand select */}
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
                 Brand *
@@ -266,7 +260,6 @@ export default function PromptsPage() {
               </select>
             </div>
 
-            {/* Templates */}
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
                 Quick Templates
@@ -294,7 +287,6 @@ export default function PromptsPage() {
               </div>
             </div>
 
-            {/* Prompt text */}
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
                 Prompt Text *
@@ -309,7 +301,6 @@ export default function PromptsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              {/* Category */}
               <div>
                 <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
                   Category
@@ -329,7 +320,6 @@ export default function PromptsPage() {
                 </select>
               </div>
 
-              {/* Frequency */}
               <div>
                 <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
                   Run Frequency
@@ -353,7 +343,6 @@ export default function PromptsPage() {
               </div>
             </div>
 
-            {/* Engines */}
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
                 Engines to Monitor
@@ -365,8 +354,8 @@ export default function PromptsPage() {
                     className={cn(
                       'rounded-xl border px-4 py-2 text-xs font-bold transition-all',
                       form.engines.includes(engine)
-                        ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
-                        : 'border-gray-800 text-gray-600 hover:text-gray-300',
+                        ? 'border-brand-500/50 bg-brand-500/10 text-brand-400'
+                        : 'border-gray-800 text-gray-500 hover:text-gray-200',
                     )}
                     onClick={() => toggleEngine(engine)}
                   >
@@ -388,7 +377,6 @@ export default function PromptsPage() {
         </Card>
       )}
 
-      {/* Prompts list */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-brand-400" />
@@ -415,5 +403,19 @@ export default function PromptsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function PromptsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-brand-400" />
+        </div>
+      }
+    >
+      <PromptsPageContent />
+    </Suspense>
   )
 }
