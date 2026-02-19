@@ -180,7 +180,7 @@ export interface AlertTriggerContext {
 }
 
 export function shouldTriggerAlert(rule: AlertRule, ctx: AlertTriggerContext): boolean {
-  const { result, previousResult, brand } = ctx
+  const { result, previousResult } = ctx
   const { type, condition } = rule
 
   switch (type) {

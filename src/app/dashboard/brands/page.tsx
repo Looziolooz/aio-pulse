@@ -3,13 +3,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  Plus, Building2, Globe, Tag, Trash2, Edit3,
-  CheckCircle2, XCircle, AlertCircle, Loader2,
+  Plus,
+  Building2,
+  Globe,
+  Tag,
+  Trash2,
+  Edit3,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/index'
-import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import type { Brand } from '@/types'
 
@@ -17,11 +23,16 @@ function BrandCard({ brand, onDelete }: { brand: Brand; onDelete: (id: string) =
   const [deleting, setDeleting] = useState(false)
 
   const handleDelete = async () => {
-    if (!confirm(`Delete brand "${brand.name}"? This will remove all associated prompts and monitoring data.`)) return
+    if (
+      !confirm(
+        `Delete brand "${brand.name}"? This will remove all associated prompts and monitoring data.`,
+      )
+    )
+      return
     setDeleting(true)
     try {
       const res = await fetch(`/api/brands/${brand.id}`, { method: 'DELETE' })
-      const json = await res.json() as { success: boolean; message?: string }
+      const json = (await res.json()) as { success: boolean; message?: string }
       if (!json.success) throw new Error(json.message)
       onDelete(brand.id)
       toast.success(`"${brand.name}" deleted`)
@@ -82,7 +93,10 @@ function BrandCard({ brand, onDelete }: { brand: Brand; onDelete: (id: string) =
         {brand.aliases.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {brand.aliases.slice(0, 3).map((a) => (
-              <span key={a} className="rounded-md border border-gray-800 bg-gray-900/50 px-2 py-0.5 text-[10px] text-gray-400">
+              <span
+                key={a}
+                className="rounded-md border border-gray-800 bg-gray-900/50 px-2 py-0.5 text-[10px] text-gray-400"
+              >
                 {a}
               </span>
             ))}
@@ -101,13 +115,22 @@ function BrandCard({ brand, onDelete }: { brand: Brand; onDelete: (id: string) =
 
       <div className="mt-5 flex items-center justify-between border-t border-gray-800 pt-4">
         <div className="flex items-center gap-1.5">
-          {brand.is_active
-            ? <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /><span className="text-xs text-emerald-400">Active</span></>
-            : <><XCircle className="h-3.5 w-3.5 text-gray-600" /><span className="text-xs text-gray-600">Paused</span></>
-          }
+          {brand.is_active ? (
+            <>
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="text-xs text-emerald-400">Active</span>
+            </>
+          ) : (
+            <>
+              <XCircle className="h-3.5 w-3.5 text-gray-600" />
+              <span className="text-xs text-gray-600">Paused</span>
+            </>
+          )}
         </div>
         <Link href={`/dashboard/prompts?brand_id=${brand.id}`}>
-          <Button size="sm" variant="outline">View Prompts</Button>
+          <Button size="sm" variant="outline">
+            View Prompts
+          </Button>
         </Link>
       </div>
     </Card>
@@ -123,7 +146,7 @@ export default function BrandsPage() {
     setLoading(true)
     try {
       const res = await fetch('/api/brands')
-      const json = await res.json() as { success: boolean; data?: Brand[]; message?: string }
+      const json = (await res.json()) as { success: boolean; data?: Brand[]; message?: string }
       if (!json.success) throw new Error(json.message)
       setBrands(json.data ?? [])
     } catch (err) {
@@ -133,7 +156,9 @@ export default function BrandsPage() {
     }
   }, [])
 
-  useEffect(() => { void loadBrands() }, [loadBrands])
+  useEffect(() => {
+    void loadBrands()
+  }, [loadBrands])
 
   const handleDelete = (id: string) => setBrands((prev) => prev.filter((b) => b.id !== id))
 
@@ -142,7 +167,9 @@ export default function BrandsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-white">Brands</h1>
-          <p className="mt-1 text-gray-400">Manage the brands you're monitoring across AI search engines.</p>
+          <p className="mt-1 text-gray-400">
+            Manage the brands you're monitoring across AI search engines.
+          </p>
         </div>
         <Link href="/dashboard/brands/new">
           <Button size="lg">

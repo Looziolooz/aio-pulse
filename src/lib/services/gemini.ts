@@ -1,4 +1,4 @@
-import type { AnalysisResult, EngineId, ModelId, IntentType } from '@/types'
+import type { AnalysisResult, EngineId, IntentType } from '@/types'
 import { generateId } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -119,8 +119,7 @@ async function callGemini(prompt: string): Promise<string> {
 export async function fetchUrlContent(url: string): Promise<string> {
   const res = await fetch(url, {
     headers: {
-      'User-Agent':
-        'Mozilla/5.0 (compatible; AIOPulseBot/1.0; +https://aio-pulse.com/bot)',
+      'User-Agent': 'Mozilla/5.0 (compatible; AIOPulseBot/1.0; +https://aio-pulse.com/bot)',
       Accept: 'text/html,application/xhtml+xml',
     },
     signal: AbortSignal.timeout(10_000),

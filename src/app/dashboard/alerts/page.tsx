@@ -2,9 +2,19 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Bell, Plus, X, Loader2, CheckCircle2, XCircle,
-  AlertTriangle, TrendingDown, TrendingUp, Trophy, Eye, Trash2,
-  Mail, Webhook,
+  Bell,
+  Plus,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
+  Eye,
+  Trash2,
+  Mail,
+  Webhook,
 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -22,23 +32,74 @@ const ALERT_TYPES: Array<{
   icon: React.ComponentType<{ className?: string }>
   color: string
 }> = [
-  { type: 'mention_new', label: 'New Mention', desc: 'Brand appears in AI response for first time', icon: CheckCircle2, color: 'emerald' },
-  { type: 'mention_lost', label: 'Mention Lost', desc: 'Brand stops appearing in AI responses', icon: XCircle, color: 'amber' },
-  { type: 'sentiment_drop', label: 'Sentiment Drop', desc: 'Negative sentiment spike detected', icon: TrendingDown, color: 'red' },
-  { type: 'sentiment_spike', label: 'Positive Spike', desc: 'Significant positive sentiment increase', icon: TrendingUp, color: 'emerald' },
-  { type: 'competitor_ahead', label: 'Competitor Leading', desc: 'Competitor cited more prominently', icon: Trophy, color: 'amber' },
-  { type: 'hallucination', label: 'Hallucination', desc: 'False info detected about your brand', icon: AlertTriangle, color: 'red' },
-  { type: 'visibility_change', label: 'Visibility Change', desc: 'Large score swing detected', icon: Eye, color: 'blue' },
+  {
+    type: 'mention_new',
+    label: 'New Mention',
+    desc: 'Brand appears in AI response for first time',
+    icon: CheckCircle2,
+    color: 'emerald',
+  },
+  {
+    type: 'mention_lost',
+    label: 'Mention Lost',
+    desc: 'Brand stops appearing in AI responses',
+    icon: XCircle,
+    color: 'amber',
+  },
+  {
+    type: 'sentiment_drop',
+    label: 'Sentiment Drop',
+    desc: 'Negative sentiment spike detected',
+    icon: TrendingDown,
+    color: 'red',
+  },
+  {
+    type: 'sentiment_spike',
+    label: 'Positive Spike',
+    desc: 'Significant positive sentiment increase',
+    icon: TrendingUp,
+    color: 'emerald',
+  },
+  {
+    type: 'competitor_ahead',
+    label: 'Competitor Leading',
+    desc: 'Competitor cited more prominently',
+    icon: Trophy,
+    color: 'amber',
+  },
+  {
+    type: 'hallucination',
+    label: 'Hallucination',
+    desc: 'False info detected about your brand',
+    icon: AlertTriangle,
+    color: 'red',
+  },
+  {
+    type: 'visibility_change',
+    label: 'Visibility Change',
+    desc: 'Large score swing detected',
+    icon: Eye,
+    color: 'blue',
+  },
 ]
 
 const TYPE_COLOR_MAP: Record<string, string> = {
-  mention_new: 'success', mention_lost: 'warning', sentiment_drop: 'danger',
-  sentiment_spike: 'success', competitor_ahead: 'warning', hallucination: 'danger', visibility_change: 'info',
+  mention_new: 'success',
+  mention_lost: 'warning',
+  sentiment_drop: 'danger',
+  sentiment_spike: 'success',
+  competitor_ahead: 'warning',
+  hallucination: 'danger',
+  visibility_change: 'info',
 }
 
 // ─── Event feed card ──────────────────────────────────────────────────────────
 
-function EventCard({ event, onMarkRead, onDelete }: {
+function EventCard({
+  event,
+  onMarkRead,
+  onDelete,
+}: {
   event: AlertEvent
   onMarkRead: (id: string) => void
   onDelete: (id: string) => void
@@ -47,22 +108,30 @@ function EventCard({ event, onMarkRead, onDelete }: {
   const Icon = typeConf?.icon ?? Bell
 
   return (
-    <div className={cn(
-      'group flex items-start gap-4 rounded-2xl border p-4 transition-all',
-      event.is_read ? 'border-gray-800 bg-gray-900/20' : 'border-brand-500/20 bg-brand-500/5',
-    )}>
-      <div className={cn(
-        'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
-        `text-${typeConf?.color ?? 'gray'}-400 bg-${typeConf?.color ?? 'gray'}-500/10`,
-      )}>
+    <div
+      className={cn(
+        'group flex items-start gap-4 rounded-2xl border p-4 transition-all',
+        event.is_read ? 'border-gray-800 bg-gray-900/20' : 'border-brand-500/20 bg-brand-500/5',
+      )}
+    >
+      <div
+        className={cn(
+          'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
+          `text-${typeConf?.color ?? 'gray'}-400 bg-${typeConf?.color ?? 'gray'}-500/10`,
+        )}
+      >
         <Icon className="h-4 w-4" />
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-center gap-2">
           {!event.is_read && <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />}
-          <p className="font-bold text-white text-sm">{event.title}</p>
-          <Badge variant={TYPE_COLOR_MAP[event.type] as Parameters<typeof Badge>[0]['variant'] ?? 'default'}>
+          <p className="text-sm font-bold text-white">{event.title}</p>
+          <Badge
+            variant={
+              (TYPE_COLOR_MAP[event.type] as Parameters<typeof Badge>[0]['variant']) ?? 'default'
+            }
+          >
             {event.type.replace(/_/g, ' ')}
           </Badge>
         </div>
@@ -72,7 +141,9 @@ function EventCard({ event, onMarkRead, onDelete }: {
             <span className="text-[10px] text-gray-600">Brand: {event.brand.name}</span>
           )}
           {event.channels_sent.length > 0 && (
-            <span className="text-[10px] text-gray-600">Sent via: {event.channels_sent.join(', ')}</span>
+            <span className="text-[10px] text-gray-600">
+              Sent via: {event.channels_sent.join(', ')}
+            </span>
           )}
           <span className="text-[10px] text-gray-700">{formatRelativeTime(event.created_at)}</span>
         </div>
@@ -94,7 +165,11 @@ function EventCard({ event, onMarkRead, onDelete }: {
 
 // ─── Rule card ────────────────────────────────────────────────────────────────
 
-function RuleCard({ rule, onToggle, onDelete }: {
+function RuleCard({
+  rule,
+  onToggle,
+  onDelete,
+}: {
   rule: AlertRule
   onToggle: (id: string) => void
   onDelete: (id: string) => void
@@ -104,21 +179,24 @@ function RuleCard({ rule, onToggle, onDelete }: {
 
   return (
     <div className="group flex items-center gap-4 rounded-2xl border border-gray-800 bg-gray-900/40 p-4 transition-all hover:border-gray-700">
-      <div className={cn(
-        'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
-        `text-${typeConf?.color ?? 'gray'}-400`,
-        rule.is_active ? `bg-${typeConf?.color ?? 'gray'}-500/10` : 'bg-gray-800',
-      )}>
+      <div
+        className={cn(
+          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+          `text-${typeConf?.color ?? 'gray'}-400`,
+          rule.is_active ? `bg-${typeConf?.color ?? 'gray'}-500/10` : 'bg-gray-800',
+        )}
+      >
         <Icon className="h-5 w-5" />
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-2">
           <p className="font-bold text-white">{rule.name}</p>
-          {rule.is_active
-            ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            : <span className="h-1.5 w-1.5 rounded-full bg-gray-600" />
-          }
+          {rule.is_active ? (
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+          ) : (
+            <span className="h-1.5 w-1.5 rounded-full bg-gray-600" />
+          )}
         </div>
         <p className="text-xs text-gray-500">{typeConf?.desc}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -131,7 +209,9 @@ function RuleCard({ rule, onToggle, onDelete }: {
             {rule.channels.join(', ')}
           </div>
           {rule.last_fired_at && (
-            <span className="text-[10px] text-gray-700">Last fired {formatRelativeTime(rule.last_fired_at)}</span>
+            <span className="text-[10px] text-gray-700">
+              Last fired {formatRelativeTime(rule.last_fired_at)}
+            </span>
           )}
         </div>
       </div>
@@ -154,7 +234,13 @@ function RuleCard({ rule, onToggle, onDelete }: {
 
 // ─── Create rule form ─────────────────────────────────────────────────────────
 
-function CreateRuleForm({ brands, onCreated }: { brands: Brand[]; onCreated: (rule: AlertRule) => void }) {
+function CreateRuleForm({
+  brands,
+  onCreated,
+}: {
+  brands: Brand[]
+  onCreated: (rule: AlertRule) => void
+}) {
   const [form, setForm] = useState({
     brand_id: '',
     name: '',
@@ -165,8 +251,6 @@ function CreateRuleForm({ brands, onCreated }: { brands: Brand[]; onCreated: (ru
     competitor: '',
   })
   const [creating, setCreating] = useState(false)
-
-  const typeConf = ALERT_TYPES.find((t) => t.type === form.type)
 
   const handleCreate = async () => {
     if (!form.brand_id || !form.name || !form.email) {
@@ -191,11 +275,19 @@ function CreateRuleForm({ brands, onCreated }: { brands: Brand[]; onCreated: (ru
           email: form.email || null,
         }),
       })
-      const json = await res.json() as { success: boolean; data?: AlertRule; message?: string }
+      const json = (await res.json()) as { success: boolean; data?: AlertRule; message?: string }
       if (!json.success) throw new Error(json.message)
       onCreated(json.data!)
       toast.success('Alert rule created')
-      setForm({ brand_id: '', name: '', type: 'mention_new', channels: ['email'], email: '', threshold: '', competitor: '' })
+      setForm({
+        brand_id: '',
+        name: '',
+        type: 'mention_new',
+        channels: ['email'],
+        email: '',
+        threshold: '',
+        competitor: '',
+      })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create rule')
     } finally {
@@ -204,25 +296,33 @@ function CreateRuleForm({ brands, onCreated }: { brands: Brand[]; onCreated: (ru
   }
 
   return (
-    <Card className="p-6 border-brand-500/20 animate-in">
+    <Card className="animate-in border-brand-500/20 p-6">
       <h2 className="mb-5 flex items-center gap-2 text-base font-bold text-white">
         <Plus className="h-4 w-4 text-brand-400" /> New Alert Rule
       </h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Brand *</label>
+          <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+            Brand *
+          </label>
           <select
             className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-2.5 text-sm text-white outline-none focus:border-brand-500"
             value={form.brand_id}
             onChange={(e) => setForm((f) => ({ ...f, brand_id: e.target.value }))}
           >
             <option value="">Select brand...</option>
-            {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
           </select>
         </div>
 
         <div>
-          <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Rule Name *</label>
+          <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+            Rule Name *
+          </label>
           <input
             className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-500"
             placeholder="e.g. New mention alert"
@@ -232,7 +332,9 @@ function CreateRuleForm({ brands, onCreated }: { brands: Brand[]; onCreated: (ru
         </div>
 
         <div className="sm:col-span-2">
-          <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Alert Type *</label>
+          <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+            Alert Type *
+          </label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {ALERT_TYPES.map((t) => (
               <button
@@ -247,7 +349,7 @@ function CreateRuleForm({ brands, onCreated }: { brands: Brand[]; onCreated: (ru
               >
                 <t.icon className={cn('mb-1.5 h-4 w-4', `text-${t.color}-400`)} />
                 <p className="text-[11px] font-bold text-white">{t.label}</p>
-                <p className="text-[10px] text-gray-600 leading-tight">{t.desc}</p>
+                <p className="text-[10px] leading-tight text-gray-600">{t.desc}</p>
               </button>
             ))}
           </div>
@@ -255,7 +357,9 @@ function CreateRuleForm({ brands, onCreated }: { brands: Brand[]; onCreated: (ru
 
         {form.type === 'competitor_ahead' && (
           <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Competitor Name</label>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+              Competitor Name
+            </label>
             <input
               className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-500"
               placeholder="e.g. GetCito"
@@ -268,7 +372,8 @@ function CreateRuleForm({ brands, onCreated }: { brands: Brand[]; onCreated: (ru
         {['sentiment_drop', 'visibility_change'].includes(form.type) && (
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
-              Threshold {form.type === 'sentiment_drop' ? '(0-1, e.g. 0.3)' : '(score points, e.g. 20)'}
+              Threshold{' '}
+              {form.type === 'sentiment_drop' ? '(0-1, e.g. 0.3)' : '(score points, e.g. 20)'}
             </label>
             <input
               className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-500"
@@ -281,7 +386,9 @@ function CreateRuleForm({ brands, onCreated }: { brands: Brand[]; onCreated: (ru
         )}
 
         <div>
-          <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Email *</label>
+          <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+            Email *
+          </label>
           <input
             className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-500"
             placeholder="alerts@yourdomain.com"
@@ -321,21 +428,26 @@ export default function AlertsPage() {
         fetch('/api/alerts'),
         fetch('/api/alerts?type=events'),
       ])
-      const bJson = await brandsRes.json() as { data?: Brand[] }
-      const rJson = await rulesRes.json() as { data?: AlertRule[] }
-      const eJson = await eventsRes.json() as { data?: AlertEvent[] }
+      const bJson = (await brandsRes.json()) as { data?: Brand[] }
+      const rJson = (await rulesRes.json()) as { data?: AlertRule[] }
+      const eJson = (await eventsRes.json()) as { data?: AlertEvent[] }
       setBrands(bJson.data ?? [])
       setRules(rJson.data ?? [])
       setEvents(eJson.data ?? [])
-    } catch { toast.error('Failed to load alerts') }
-    finally { setLoading(false) }
+    } catch {
+      toast.error('Failed to load alerts')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  useEffect(() => { void loadData() }, [loadData])
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleMarkRead = async (id: string) => {
     await fetch(`/api/alerts?id=${id}&action=read`, { method: 'PUT' })
-    setEvents((prev) => prev.map((e) => e.id === id ? { ...e, is_read: true } : e))
+    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, is_read: true } : e)))
   }
 
   const handleDeleteEvent = async (id: string) => {
@@ -346,9 +458,9 @@ export default function AlertsPage() {
 
   const handleToggleRule = async (id: string) => {
     const res = await fetch(`/api/alerts?id=${id}&action=toggle`, { method: 'PUT' })
-    const json = await res.json() as { success: boolean; data?: AlertRule }
+    const json = (await res.json()) as { success: boolean; data?: AlertRule }
     if (json.success && json.data) {
-      setRules((prev) => prev.map((r) => r.id === id ? json.data! : r))
+      setRules((prev) => prev.map((r) => (r.id === id ? json.data! : r)))
     }
   }
 
@@ -367,7 +479,9 @@ export default function AlertsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-white">Alerts</h1>
-          <p className="mt-1 text-gray-400">Real-time notifications when your brand visibility changes.</p>
+          <p className="mt-1 text-gray-400">
+            Real-time notifications when your brand visibility changes.
+          </p>
         </div>
         <Button onClick={() => setShowForm((v) => !v)}>
           <Plus className="h-5 w-5" /> New Rule
@@ -377,7 +491,11 @@ export default function AlertsPage() {
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Active Rules', value: rules.filter((r) => r.is_active).length, color: 'text-emerald-400' },
+          {
+            label: 'Active Rules',
+            value: rules.filter((r) => r.is_active).length,
+            color: 'text-emerald-400',
+          },
           { label: 'Unread Events', value: unreadCount, color: 'text-brand-400' },
           { label: 'Total Events', value: events.length, color: 'text-gray-400' },
         ].map((s) => (
@@ -391,7 +509,10 @@ export default function AlertsPage() {
       {showForm && (
         <CreateRuleForm
           brands={brands}
-          onCreated={(rule) => { setRules((prev) => [rule, ...prev]); setShowForm(false) }}
+          onCreated={(rule) => {
+            setRules((prev) => [rule, ...prev])
+            setShowForm(false)
+          }}
         />
       )}
 
@@ -417,7 +538,9 @@ export default function AlertsPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-brand-400" /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-brand-400" />
+        </div>
       ) : tab === 'events' ? (
         <div className="space-y-3">
           {events.length > 0 && unreadCount > 0 && (
@@ -431,7 +554,9 @@ export default function AlertsPage() {
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <Bell className="mb-4 h-16 w-16 text-gray-800" />
               <h2 className="mb-2 text-xl font-bold text-white">No events yet</h2>
-              <p className="text-gray-500">Alert events will appear here when your monitoring rules trigger.</p>
+              <p className="text-gray-500">
+                Alert events will appear here when your monitoring rules trigger.
+              </p>
             </div>
           ) : (
             events.map((event) => (
@@ -450,7 +575,9 @@ export default function AlertsPage() {
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <Bell className="mb-4 h-16 w-16 text-gray-800" />
               <h2 className="mb-2 text-xl font-bold text-white">No alert rules</h2>
-              <p className="mb-6 text-gray-500">Create a rule to get notified when brand metrics change.</p>
+              <p className="mb-6 text-gray-500">
+                Create a rule to get notified when brand metrics change.
+              </p>
               <Button onClick={() => setShowForm(true)}>
                 <Plus className="h-4 w-4" /> Create first rule
               </Button>

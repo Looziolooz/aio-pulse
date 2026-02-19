@@ -62,6 +62,11 @@
     --transition-fast: 150ms ease;
     --transition-base: 250ms ease;
     --transition-slow: 400ms ease;
+
+    /* Layout */
+    --sidebar-width: 0px;
+    --header-height: 60px;
+    --container-max: 100%;
   }
 
   .dark {
@@ -73,6 +78,61 @@
     --color-text: 248 250 252;
     --color-text-muted: 148 163 184;
     --color-text-subtle: 71 85 105;
+  }
+
+  /* ─── Tablet Breakpoint (768px) ───────────────────────────────────────────────── */
+  @media (min-width: 768px) {
+    :root {
+      --space-md: 1.25rem;
+      --space-lg: 2rem;
+      --space-xl: 2.5rem;
+      --space-2xl: 3.5rem;
+      --space-3xl: 5rem;
+
+      --font-size-base: 1rem;
+      --font-size-lg: 1.125rem;
+      --font-size-xl: 1.5rem;
+      --font-size-2xl: 1.875rem;
+      --font-size-3xl: 2.5rem;
+      --font-size-4xl: 3.5rem;
+
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+      --header-height: 64px;
+      --container-max: 720px;
+    }
+  }
+
+  /* ─── Desktop Breakpoint (1024px) ─────────────────────────────────────────────── */
+  @media (min-width: 1024px) {
+    :root {
+      --space-md: 1.5rem;
+      --space-lg: 2rem;
+      --space-xl: 3rem;
+      --space-2xl: 4rem;
+      --space-3xl: 6rem;
+
+      --font-size-base: 1rem;
+      --font-size-lg: 1.25rem;
+      --font-size-xl: 1.75rem;
+      --font-size-2xl: 2rem;
+      --font-size-3xl: 3rem;
+      --font-size-4xl: 4rem;
+
+      --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+      --sidebar-width: 260px;
+      --header-height: 72px;
+      --container-max: 960px;
+    }
+  }
+
+  /* ─── Large Desktop Breakpoint (1280px) ───────────────────────────────────────── */
+  @media (min-width: 1280px) {
+    :root {
+      --container-max: 1120px;
+    }
   }
 }
 
@@ -128,7 +188,12 @@
     color: rgb(var(--color-text));
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display, inherit);
     letter-spacing: -0.025em;
     line-height: 1.2;
@@ -138,6 +203,76 @@
 /* ─── Component Utilities ───────────────────────────────────────────────────── */
 
 @layer components {
+  /* Responsive sidebar layout */
+  .layout-with-sidebar {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding-top: var(--header-height);
+  }
+
+  @media (min-width: 1024px) {
+    .layout-with-sidebar {
+      padding-left: var(--sidebar-width);
+    }
+  }
+
+  /* Responsive stack layout */
+  .stack-responsive {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  @media (min-width: 768px) {
+    .stack-responsive {
+      flex-direction: row;
+      align-items: flex-start;
+    }
+    .stack-responsive > * {
+      flex: 1;
+    }
+  }
+
+  /* Split layout */
+  .split-responsive {
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (min-width: 768px) {
+    .split-responsive {
+      flex-direction: row;
+    }
+    .split-responsive-main {
+      flex: 2;
+    }
+    .split-responsive-side {
+      flex: 1;
+    }
+  }
+
+  /* Responsive card */
+  .card-responsive {
+    width: 100%;
+    padding: var(--space-md);
+    background: rgb(var(--color-surface));
+    border: 1px solid rgb(var(--color-border));
+    border-radius: var(--radius-lg);
+  }
+
+  @media (min-width: 768px) {
+    .card-responsive {
+      padding: var(--space-lg);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .card-responsive {
+      padding: var(--space-xl);
+    }
+  }
+
   /* Glassmorphism card */
   .glass {
     background: rgb(var(--color-surface) / 0.8);
@@ -174,8 +309,12 @@
   }
 
   @keyframes shimmer {
-    0%   { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 
   /* Gradient text */
@@ -195,18 +334,240 @@
 /* ─── Utility Layer ─────────────────────────────────────────────────────────── */
 
 @layer utilities {
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 
   .animate-in {
     animation: fadeUp 0.4s ease-out both;
   }
 
   @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
-  .balance { text-wrap: balance; }
-  .pretty  { text-wrap: pretty; }
+  .balance {
+    text-wrap: balance;
+  }
+  .pretty {
+    text-wrap: pretty;
+  }
+
+  /* Responsive Container */
+  .container-responsive {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+    max-width: var(--container-max);
+  }
+
+  /* Responsive Spacing Utilities */
+  .gap-responsive {
+    gap: var(--space-md);
+  }
+  .p-responsive {
+    padding: var(--space-md);
+  }
+  .m-responsive {
+    margin: var(--space-md);
+  }
+
+  /* Responsive Text Alignment */
+  .text-responsive {
+    text-align: left;
+  }
+
+  /* Responsive Display */
+  .responsive-hidden {
+    display: none;
+  }
+  .responsive-flex {
+    display: flex;
+  }
+  .responsive-grid {
+    display: grid;
+  }
+
+  /* Tablet and up */
+  @media (min-width: 768px) {
+    .container-responsive {
+      padding-left: var(--space-lg);
+      padding-right: var(--space-lg);
+    }
+    .gap-responsive {
+      gap: var(--space-lg);
+    }
+    .p-responsive {
+      padding: var(--space-lg);
+    }
+    .m-responsive {
+      margin: var(--space-lg);
+    }
+    .text-responsive {
+      text-align: left;
+    }
+    .tablet-hidden {
+      display: none;
+    }
+    .tablet-flex {
+      display: flex;
+    }
+    .tablet-grid {
+      display: grid;
+    }
+    .tablet-block {
+      display: block;
+    }
+    .tablet-inline {
+      display: inline;
+    }
+    .tablet-flex-row {
+      flex-direction: row;
+    }
+    .tablet-col {
+      flex-direction: column;
+    }
+  }
+
+  /* Desktop and up */
+  @media (min-width: 1024px) {
+    .container-responsive {
+      padding-left: var(--space-xl);
+      padding-right: var(--space-xl);
+    }
+    .gap-responsive {
+      gap: var(--space-xl);
+    }
+    .p-responsive {
+      padding: var(--space-xl);
+    }
+    .m-responsive {
+      margin: var(--space-xl);
+    }
+    .text-responsive {
+      text-align: left;
+    }
+    .desktop-hidden {
+      display: none;
+    }
+    .desktop-flex {
+      display: flex;
+    }
+    .desktop-grid {
+      display: grid;
+    }
+    .desktop-block {
+      display: block;
+    }
+    .desktop-inline {
+      display: inline;
+    }
+    .desktop-flex-row {
+      flex-direction: row;
+    }
+    .desktop-col {
+      flex-direction: column;
+    }
+  }
+
+  /* Mobile only utilities */
+  @media (max-width: 767px) {
+    .mobile-hidden {
+      display: none;
+    }
+    .mobile-flex {
+      display: flex;
+    }
+    .mobile-grid {
+      display: grid;
+    }
+    .mobile-block {
+      display: block;
+    }
+  }
+
+  /* Responsive Width/Height */
+  .w-responsive {
+    width: 100%;
+  }
+  .min-h-responsive {
+    min-height: 100vh;
+  }
+
+  /* Responsive Grid Columns */
+  .grid-cols-responsive {
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 768px) {
+    .grid-cols-responsive {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (min-width: 1024px) {
+    .grid-cols-responsive {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  /* Responsive Card Grid */
+  .card-grid-responsive {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+  @media (min-width: 640px) {
+    .card-grid-responsive {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (min-width: 1024px) {
+    .card-grid-responsive {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  @media (min-width: 1280px) {
+    .card-grid-responsive {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .animate-in {
+    animation: fadeUp 0.4s ease-out both;
+  }
+
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .balance {
+    text-wrap: balance;
+  }
+  .pretty {
+    text-wrap: pretty;
+  }
 }

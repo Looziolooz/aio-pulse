@@ -3,7 +3,6 @@
 import { useState, useCallback } from 'react'
 import {
   FileSearch,
-  Globe,
   Link2,
   Sparkles,
   AlertCircle,
@@ -27,7 +26,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts'
-import { Card, CardHeader, CardBody } from '@/components/ui/Card'
+import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/index'
 import { useAppStore } from '@/lib/store'
@@ -144,7 +143,7 @@ export default function OptimizerPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
-  const { value: showDetails, set: setShowDetails, toggle: toggleDetails } = useToggle(false)
+  const { value: showDetails, toggle: toggleDetails } = useToggle(false)
 
   const { copied, copy } = useClipboard()
   const addScan = useAppStore((s) => s.addScan)

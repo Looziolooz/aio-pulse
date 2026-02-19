@@ -1,65 +1,26 @@
+// PATH: src/lib/services/monitoring.ts
+// VERSIONE AGGIORNATA — usa ai-router.ts per fallback automatico multi-provider.
+
 import type {
-  MonitoringEngine, MonitoringResult, Brand, Prompt,
-  SentimentLabel, MentionType, CompetitorMention, HallucinationFlag,
+  MonitoringEngine,
+  MonitoringResult,
+  Brand,
+  Prompt,
+  SentimentLabel,
+  MentionType,
+  CompetitorMention,
+  HallucinationFlag,
 } from '@/types'
-import { generateId } from '@/lib/utils'
 
-// ─── Gemini caller ────────────────────────────────────────────────────────────
-
-async function callGemini(prompt: string): Promise<string> {
-  const apiKey = process.env['GEMINI_API_KEY']
-  if (!apiKey) throw new Error('GEMINI_API_KEY not configured')
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
-    }),
-  })
-
-  if (!res.ok) throw new Error(`Gemini API error ${res.status}`)
-  const data = await res.json() as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
-  }
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) throw new Error('Empty Gemini response')
-  return text
-}
+import {
+  simulateEngineResponse as routerSimulate,
+  analyzeResponseForBrand as routerAnalyze,
+} from './ai-router'
 
 function parseJson<T>(raw: string): T {
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
   return JSON.parse(cleaned) as T
 }
-
-// ─── Step 1: Simulate AI engine response ─────────────────────────────────────
-// Since we can't call ChatGPT/Perplexity directly (no API access in free tier),
-// we use Gemini to simulate how each engine would respond to the prompt,
-// then analyze that response for brand mentions.
-
-async function simulateEngineResponse(
-  promptText: string,
-  engine: MonitoringEngine,
-  brandName: string,
-): Promise<string> {
-  const enginePersona: Record<MonitoringEngine, string> = {
-    chatgpt: 'You are ChatGPT, a helpful AI assistant by OpenAI. Answer conversationally and helpfully.',
-    gemini: 'You are Google Gemini, a helpful AI assistant. Answer factually with structured information.',
-    perplexity: 'You are Perplexity AI, a search-focused AI assistant. Answer with facts and cite sources where possible.',
-  }
-
-  const systemPrompt = `${enginePersona[engine]}
-
-The user is asking: "${promptText}"
-
-Provide a realistic, helpful response as this AI system would. Include relevant brands, products, and services in your answer as appropriate. Keep it 150-300 words.`
-
-  return callGemini(systemPrompt)
-}
-
-// ─── Step 2: Analyze response for brand metrics ───────────────────────────────
 
 interface AnalysisOutput {
   brand_mentioned: boolean
@@ -76,12 +37,8 @@ interface AnalysisOutput {
   hallucination_flags: HallucinationFlag[]
 }
 
-async function analyzeResponseForBrand(
-  responseText: string,
-  brand: Brand,
-  promptText: string,
-): Promise<AnalysisOutput> {
-  const prompt = `You are an AI brand monitoring analyst. Analyze this AI-generated response for mentions and sentiment about the brand "${brand.name}".
+function buildAnalysisPrompt(responseText: string, brand: Brand, promptText: string): string {
+  return `You are an AI brand monitoring analyst. Analyze this AI-generated response for mentions and sentiment about the brand "${brand.name}".
 
 BRAND INFO:
 - Primary name: ${brand.name}
@@ -93,38 +50,35 @@ ORIGINAL PROMPT/QUERY: "${promptText}"
 
 AI RESPONSE TO ANALYZE:
 """
-${responseText}
+${responseText.slice(0, 3000)}
 """
 
-Respond ONLY with a valid JSON object (no markdown):
+Respond ONLY with a valid JSON object (no markdown, no extra text):
 {
   "brand_mentioned": <boolean>,
-  "mention_position": <1-based position of first mention, or null if not mentioned>,
-  "mention_count": <number of times brand is mentioned>,
+  "mention_position": <1-based integer position of first mention, or null>,
+  "mention_count": <integer>,
   "mention_type": <"direct" | "indirect" | "none">,
-  "visibility_score": <0-100, how prominently featured>,
+  "visibility_score": <integer 0-100>,
   "sentiment": <"positive" | "negative" | "neutral">,
-  "sentiment_score": <-1.0 to 1.0>,
-  "sentiment_reasoning": "<why this sentiment>",
-  "cited_urls": ["<any URLs mentioned>"],
+  "sentiment_score": <float -1.0 to 1.0>,
+  "sentiment_reasoning": "<one sentence explanation>",
+  "cited_urls": ["<url>"],
   "competitor_mentions": [
-    {"name": "<competitor name>", "position": <1-based>, "count": <mentions>}
+    {"name": "<n>", "position": <integer>, "count": <integer>}
   ],
   "has_hallucination": <boolean>,
   "hallucination_flags": [
     {
       "text": "<the potentially false claim>",
-      "severity": <"low"|"medium"|"high">,
-      "type": <"factual_error"|"attribution_error"|"fabrication"|"date_error">
+      "severity": <"low" | "medium" | "high">,
+      "type": <"factual_error" | "attribution_error" | "fabrication" | "date_error">
     }
   ]
 }`
-
-  const raw = await callGemini(prompt)
-  return parseJson<AnalysisOutput>(raw)
 }
 
-// ─── Main: run one prompt on one engine ──────────────────────────────────────
+// ─── runMonitoringCheck ───────────────────────────────────────────────────────
 
 export async function runMonitoringCheck(
   prompt: Prompt,
@@ -132,11 +86,26 @@ export async function runMonitoringCheck(
   engine: MonitoringEngine,
   userId: string,
 ): Promise<Omit<MonitoringResult, 'id' | 'created_at'>> {
-  // 1. Simulate engine response
-  const responseText = await simulateEngineResponse(prompt.text, engine, brand.name)
+  // Step 1: simula risposta engine
+  const { text: responseText, provider: simulationProvider } =
+    await routerSimulate(prompt.text, engine)
+  console.log(`[monitoring] ${engine} simulato con: ${simulationProvider}`)
 
-  // 2. Analyze for brand metrics
-  const analysis = await analyzeResponseForBrand(responseText, brand, prompt.text)
+  // Step 2: analizza per metriche brand
+  const analysisPrompt = buildAnalysisPrompt(responseText, brand, prompt.text)
+  const { text: analysisRaw, provider: analysisProvider } =
+    await routerAnalyze(analysisPrompt)
+  console.log(`[monitoring] ${engine} analisi con: ${analysisProvider}`)
+
+  let analysis: AnalysisOutput
+  try {
+    analysis = parseJson<AnalysisOutput>(analysisRaw)
+  } catch {
+    throw new Error(
+      `Impossibile parsare la risposta di analisi da ${analysisProvider}. ` +
+        `Raw: ${analysisRaw.slice(0, 200)}`,
+    )
+  }
 
   return {
     prompt_id: prompt.id,
@@ -144,7 +113,8 @@ export async function runMonitoringCheck(
     user_id: userId,
     engine,
     prompt_text: prompt.text,
-    response_text: responseText,
+    response_text:
+      responseText.length > 5000 ? responseText.slice(0, 5000) + '…' : responseText,
     brand_mentioned: analysis.brand_mentioned,
     mention_position: analysis.mention_position,
     mention_count: analysis.mention_count,
@@ -159,7 +129,7 @@ export async function runMonitoringCheck(
   }
 }
 
-// ─── Sentiment analyzer (standalone) ─────────────────────────────────────────
+// ─── analyzeSentiment ─────────────────────────────────────────────────────────
 
 export interface SentimentResult {
   sentiment: SentimentLabel
@@ -180,22 +150,27 @@ TEXT:
 ${text.slice(0, 4000)}
 """
 
-Respond ONLY with JSON:
+Respond ONLY with valid JSON (no markdown):
 {
-  "sentiment": <"positive"|"negative"|"neutral">,
-  "score": <-1.0 to 1.0>,
-  "confidence": <0-100>,
-  "reasoning": "<brief explanation>",
+  "sentiment": <"positive" | "negative" | "neutral">,
+  "score": <float -1.0 to 1.0>,
+  "confidence": <integer 0-100>,
+  "reasoning": "<one paragraph explanation>",
   "aspects": [
-    {"aspect": "<what aspect>", "sentiment": <"positive"|"negative"|"neutral">, "explanation": "<why>"}
+    {
+      "aspect": "<what aspect of the brand>",
+      "sentiment": <"positive" | "negative" | "neutral">,
+      "explanation": "<brief reason>"
+    }
   ]
 }`
 
-  const raw = await callGemini(prompt)
+  const { text: raw, provider } = await routerAnalyze(prompt)
+  console.log(`[monitoring] analyzeSentiment con: ${provider}`)
   return parseJson<SentimentResult>(raw)
 }
 
-// ─── Hallucination detector (standalone) ─────────────────────────────────────
+// ─── detectHallucinations ─────────────────────────────────────────────────────
 
 export interface HallucinationResult {
   has_hallucination: boolean
@@ -209,9 +184,10 @@ export async function detectHallucinations(
   brandName: string,
   knownFacts: string[],
 ): Promise<HallucinationResult> {
-  const factsBlock = knownFacts.length > 0
-    ? `Known facts about ${brandName}:\n${knownFacts.map((f) => `- ${f}`).join('\n')}`
-    : `No specific facts provided. Flag any claims that seem suspicious or unverifiable.`
+  const factsBlock =
+    knownFacts.length > 0
+      ? `Known facts about ${brandName}:\n${knownFacts.map((f) => `- ${f}`).join('\n')}`
+      : `No specific facts provided. Flag any claims that seem suspicious or unverifiable.`
 
   const prompt = `You are a fact-checking AI. Analyze this AI-generated response for potential hallucinations or factual errors about "${brandName}".
 
@@ -222,36 +198,40 @@ AI RESPONSE:
 ${aiResponse.slice(0, 4000)}
 """
 
-Respond ONLY with JSON:
+Respond ONLY with valid JSON (no markdown):
 {
   "has_hallucination": <boolean>,
-  "confidence": <0-100, how confident you are>,
+  "confidence": <integer 0-100>,
   "flags": [
     {
-      "text": "<the exact claim that may be false>",
-      "severity": <"low"|"medium"|"high">,
-      "type": <"factual_error"|"attribution_error"|"fabrication"|"date_error">
+      "text": "<exact claim that may be false>",
+      "severity": <"low" | "medium" | "high">,
+      "type": <"factual_error" | "attribution_error" | "fabrication" | "date_error">
     }
   ],
-  "summary": "<brief overall assessment>"
+  "summary": "<one paragraph overall assessment>"
 }`
 
-  const raw = await callGemini(prompt)
+  const { text: raw, provider } = await routerAnalyze(prompt)
+  console.log(`[monitoring] detectHallucinations con: ${provider}`)
   return parseJson<HallucinationResult>(raw)
 }
 
-// ─── Brand health score calculator ────────────────────────────────────────────
+// ─── calculateHealthScore ─────────────────────────────────────────────────────
+// BUG FIX: versione corretta senza overflow negativo
 
 export function calculateHealthScore(
-  visibilityScore: number,
-  sentimentScore: number,    // -1 to 1
-  hallucinationRate: number, // 0 to 1
+  visibilityScore: number,    // 0 – 100
+  sentimentScore: number,     // -1 – 1
+  hallucinationRate: number,  // 0 – 1
 ): number {
-  // Normalize sentiment from -1..1 to 0..100
-  const sentimentNorm = ((sentimentScore + 1) / 2) * 100
-  // Hallucination penalty: 0 = perfect, 1 = total failure
-  const hallucinationPenalty = hallucinationRate * 30 // max 30 point deduction
-  // Weighted composite
-  const raw = visibilityScore * 0.5 + sentimentNorm * 0.3 + (100 - hallucinationPenalty * 100) * 0.2
+  const sentimentNorm = ((sentimentScore + 1) / 2) * 100  // → 0-100
+  const hallucinationPenalty = hallucinationRate * 30     // max 30 punti sottratti
+
+  const raw =
+    visibilityScore * 0.5 +
+    sentimentNorm * 0.3 +
+    (100 - hallucinationPenalty) * 0.2
+
   return Math.min(100, Math.max(0, Math.round(raw)))
 }

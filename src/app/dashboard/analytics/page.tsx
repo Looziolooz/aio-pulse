@@ -2,10 +2,21 @@
 
 import { useMemo } from 'react'
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Minus, Award, BarChart2, Globe, Zap } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/index'
 import { useAppStore } from '@/lib/store'
@@ -48,14 +59,27 @@ const CONTENT_DATA = [
 // ─── Tooltip Style ────────────────────────────────────────────────────────────
 
 const tooltipStyle = {
-  contentStyle: { background: '#0f172a', border: '1px solid #1f2937', borderRadius: 8, fontSize: 12 },
+  contentStyle: {
+    background: '#0f172a',
+    border: '1px solid #1f2937',
+    borderRadius: 8,
+    fontSize: 12,
+  },
   labelStyle: { color: '#e2e8f0', fontWeight: 700 },
 }
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
-function StatCard({ title, value, change, suffix = '' }: {
-  title: string; value: string | number; change: number; suffix?: string
+function StatCard({
+  title,
+  value,
+  change,
+  suffix = '',
+}: {
+  title: string
+  value: string | number
+  change: number
+  suffix?: string
 }) {
   const isPos = change > 0
   const isNeutral = change === 0
@@ -64,13 +88,19 @@ function StatCard({ title, value, change, suffix = '' }: {
   return (
     <Card className="p-5">
       <p className="mb-3 text-sm font-medium text-gray-400">{title}</p>
-      <p className="text-3xl font-black text-white">{value}{suffix}</p>
-      <div className={cn(
-        'mt-2 flex items-center gap-1 text-xs font-bold',
-        isPos ? 'text-emerald-400' : isNeutral ? 'text-gray-500' : 'text-red-400',
-      )}>
+      <p className="text-3xl font-black text-white">
+        {value}
+        {suffix}
+      </p>
+      <div
+        className={cn(
+          'mt-2 flex items-center gap-1 text-xs font-bold',
+          isPos ? 'text-emerald-400' : isNeutral ? 'text-gray-500' : 'text-red-400',
+        )}
+      >
         <TrendIcon className="h-3.5 w-3.5" />
-        {isPos ? '+' : ''}{change}% vs last month
+        {isPos ? '+' : ''}
+        {change}% vs last month
       </div>
     </Card>
   )
@@ -95,10 +125,14 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-white">Analytics</h1>
-          <p className="mt-1 text-gray-400">Cross-platform AI visibility metrics and trend analysis.</p>
+          <p className="mt-1 text-gray-400">
+            Cross-platform AI visibility metrics and trend analysis.
+          </p>
         </div>
         {totalScans > 0 && (
-          <Badge variant="brand">{totalScans} scan{totalScans > 1 ? 's' : ''} in history</Badge>
+          <Badge variant="brand">
+            {totalScans} scan{totalScans > 1 ? 's' : ''} in history
+          </Badge>
         )}
       </div>
 
@@ -162,7 +196,12 @@ export default function AnalyticsPage() {
             <BarChart data={ENGINE_DATA} layout="vertical">
               <CartesianGrid horizontal={false} stroke="#1f2937" />
               <XAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#6b7280' }} type="number" />
-              <YAxis dataKey="engine" tick={{ fontSize: 11, fill: '#9ca3af' }} type="category" width={70} />
+              <YAxis
+                dataKey="engine"
+                tick={{ fontSize: 11, fill: '#9ca3af' }}
+                type="category"
+                width={70}
+              />
               <Tooltip {...tooltipStyle} />
               <Bar dataKey="score" name="Score" radius={[0, 4, 4, 0]}>
                 {ENGINE_DATA.map((entry) => (
@@ -259,7 +298,10 @@ export default function AnalyticsPage() {
               <thead>
                 <tr className="border-b border-gray-800">
                   {['Source', 'Engine', 'Score', 'Intent', 'Date'].map((h) => (
-                    <th key={h} className="pb-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    <th
+                      key={h}
+                      className="pb-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-500"
+                    >
                       {h}
                     </th>
                   ))}
@@ -268,21 +310,26 @@ export default function AnalyticsPage() {
               <tbody>
                 {scanHistory.slice(0, 10).map((scan) => (
                   <tr key={scan.id} className="border-b border-gray-800/50">
-                    <td className="py-3 max-w-[180px] truncate text-gray-300">{scan.source}</td>
+                    <td className="max-w-[180px] truncate py-3 text-gray-300">{scan.source}</td>
                     <td className="py-3">
                       <Badge variant="brand">{scan.engine}</Badge>
                     </td>
                     <td className="py-3">
-                      <span className={cn(
-                        'font-bold',
-                        scan.visibilityScore >= 80 ? 'text-emerald-400' :
-                        scan.visibilityScore >= 50 ? 'text-brand-400' : 'text-red-400',
-                      )}>
+                      <span
+                        className={cn(
+                          'font-bold',
+                          scan.visibilityScore >= 80
+                            ? 'text-emerald-400'
+                            : scan.visibilityScore >= 50
+                              ? 'text-brand-400'
+                              : 'text-red-400',
+                        )}
+                      >
                         {scan.visibilityScore}
                       </span>
                     </td>
                     <td className="py-3 text-gray-400">{scan.intent}</td>
-                    <td className="py-3 text-gray-500 text-xs">{formatDate(scan.timestamp)}</td>
+                    <td className="py-3 text-xs text-gray-500">{formatDate(scan.timestamp)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -38,3 +38,52 @@ next-env.d.ts
 # Testing
 coverage/
 .nyc_output/
+
+# PATH: .gitignore  (merge these lines into your existing .gitignore)
+
+# ─── Secrets — NEVER commit these ────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.development
+
+# Private keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Doppler
+.doppler.json
+
+# ─── Next.js ──────────────────────────────────────────────────────────────────
+.next/
+out/
+build/
+
+# ─── Node ─────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+
+# ─── TypeScript ───────────────────────────────────────────────────────────────
+*.tsbuildinfo
+
+# ─── Testing ──────────────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+

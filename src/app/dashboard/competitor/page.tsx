@@ -1,10 +1,16 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { GitCompare, Plus, X, Sparkles, Trophy, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
+import { GitCompare, Plus, X, Trophy, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
 import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  ResponsiveContainer, Tooltip, Legend,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ResponsiveContainer,
+  Tooltip,
+  Legend,
 } from 'recharts'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -25,13 +31,22 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
   const circ = 2 * Math.PI * r
   const offset = circ - (score / 100) * circ
   return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: 68, height: 68 }}>
+    <div
+      className="relative inline-flex items-center justify-center"
+      style={{ width: 68, height: 68 }}
+    >
       <svg className="-rotate-90" height={68} width={68}>
         <circle cx={34} cy={34} fill="none" r={r} stroke="#1f2937" strokeWidth="6" />
         <circle
-          cx={34} cy={34} fill="none" r={r}
-          stroke={color} strokeDasharray={circ} strokeDashoffset={offset}
-          strokeLinecap="round" strokeWidth="6"
+          cx={34}
+          cy={34}
+          fill="none"
+          r={r}
+          stroke={color}
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          strokeWidth="6"
           style={{ transition: 'stroke-dashoffset 1s ease' }}
         />
       </svg>
@@ -43,9 +58,15 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
 // ─── Result Card ──────────────────────────────────────────────────────────────
 
 function ResultCard({
-  result, rank, color, isPrimary,
+  result,
+  rank,
+  color,
+  isPrimary,
 }: {
-  result: CompetitorResult; rank: number; color: string; isPrimary: boolean
+  result: CompetitorResult
+  rank: number
+  color: string
+  isPrimary: boolean
 }) {
   const isWinner = rank === 0
 
@@ -54,7 +75,7 @@ function ResultCard({
       {/* Header */}
       <div className="mb-4 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="mb-1 flex items-center gap-2">
             <span className="text-base">{RANK_BADGES[rank]}</span>
             {isPrimary && <Badge variant="brand">Your Site</Badge>}
             {isWinner && <Badge variant="success">Winner</Badge>}
@@ -86,7 +107,9 @@ function ResultCard({
       {/* Top keywords */}
       {result.keywords.length > 0 && (
         <div className="mt-4 border-t border-gray-800 pt-3">
-          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-gray-600">Top Keywords</p>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-gray-600">
+            Top Keywords
+          </p>
           <div className="flex flex-wrap gap-1">
             {result.keywords.slice(0, 3).map((k) => (
               <span
@@ -119,7 +142,8 @@ export default function CompetitorPage() {
   const addCompetitor = () => {
     if (competitorUrls.length < 3) setCompetitorUrls((prev) => [...prev, ''])
   }
-  const removeCompetitor = (i: number) => setCompetitorUrls((prev) => prev.filter((_, idx) => idx !== i))
+  const removeCompetitor = (i: number) =>
+    setCompetitorUrls((prev) => prev.filter((_, idx) => idx !== i))
   const updateCompetitor = (i: number, val: string) => {
     setCompetitorUrls((prev) => prev.map((u, idx) => (idx === i ? val : u)))
   }
@@ -142,7 +166,7 @@ export default function CompetitorPage() {
         }),
       })
 
-      const json = await res.json() as {
+      const json = (await res.json()) as {
         success: boolean
         data?: { primary: CompetitorResult; competitors: CompetitorResult[] }
         message?: string
@@ -172,9 +196,12 @@ export default function CompetitorPage() {
 
   // Rank all results by score
   const rankedResults = results
-    ? [...[{ ...results.primary, isPrimary: true }, ...results.competitors.map((c) => ({ ...c, isPrimary: false }))]].sort(
-        (a, b) => b.score - a.score,
-      )
+    ? [
+        ...[
+          { ...results.primary, isPrimary: true },
+          ...results.competitors.map((c) => ({ ...c, isPrimary: false })),
+        ],
+      ].sort((a, b) => b.score - a.score)
     : []
 
   const winner = rankedResults[0]
@@ -184,7 +211,9 @@ export default function CompetitorPage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-black tracking-tight text-white">Competitor Comparison</h1>
-        <p className="mt-1 text-gray-400">Benchmark your AI visibility against up to 3 competitors.</p>
+        <p className="mt-1 text-gray-400">
+          Benchmark your AI visibility against up to 3 competitors.
+        </p>
       </div>
 
       {/* Input Card */}
@@ -268,16 +297,17 @@ export default function CompetitorPage() {
 
       {/* Results */}
       {results && (
-        <div className="space-y-6 animate-in">
+        <div className="animate-in space-y-6">
           {/* Winner banner */}
           {winner && (
             <div className="flex items-center gap-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-6 py-4">
               <Trophy className="h-8 w-8 text-emerald-400" />
               <div>
                 <p className="font-bold text-emerald-300">
-                  {winner.isPrimary ? '🎉 Your site leads!' : 'Competitor leads'} — Score: {winner.score}/100
+                  {winner.isPrimary ? '🎉 Your site leads!' : 'Competitor leads'} — Score:{' '}
+                  {winner.score}/100
                 </p>
-                <p className="text-xs text-gray-500 truncate max-w-md">{winner.url}</p>
+                <p className="max-w-md truncate text-xs text-gray-500">{winner.url}</p>
               </div>
               <Button
                 className="ml-auto"
@@ -311,9 +341,17 @@ export default function CompetitorPage() {
                 <RadarChart data={radarData}>
                   <PolarGrid stroke="#1f2937" />
                   <PolarAngleAxis dataKey="engine" tick={{ fontSize: 12, fill: '#6b7280' }} />
-                  <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 9, fill: '#4b5563' }} />
+                  <PolarRadiusAxis
+                    angle={90}
+                    domain={[0, 100]}
+                    tick={{ fontSize: 9, fill: '#4b5563' }}
+                  />
                   <Tooltip
-                    contentStyle={{ background: '#0f172a', border: '1px solid #1f2937', borderRadius: 8 }}
+                    contentStyle={{
+                      background: '#0f172a',
+                      border: '1px solid #1f2937',
+                      borderRadius: 8,
+                    }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   {rankedResults.map((r, i) => (
@@ -339,10 +377,18 @@ export default function CompetitorPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-800">
-                    <th className="pb-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">URL</th>
-                    <th className="pb-3 text-center text-[10px] font-black uppercase tracking-widest text-gray-500">Score</th>
-                    <th className="pb-3 text-center text-[10px] font-black uppercase tracking-widest text-gray-500">Delta</th>
-                    <th className="pb-3 text-center text-[10px] font-black uppercase tracking-widest text-gray-500">Rank</th>
+                    <th className="pb-3 text-left text-[10px] font-black uppercase tracking-widest text-gray-500">
+                      URL
+                    </th>
+                    <th className="pb-3 text-center text-[10px] font-black uppercase tracking-widest text-gray-500">
+                      Score
+                    </th>
+                    <th className="pb-3 text-center text-[10px] font-black uppercase tracking-widest text-gray-500">
+                      Delta
+                    </th>
+                    <th className="pb-3 text-center text-[10px] font-black uppercase tracking-widest text-gray-500">
+                      Rank
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -350,15 +396,27 @@ export default function CompetitorPage() {
                     const delta = r.score - results.primary.score
                     return (
                       <tr key={r.url} className="border-b border-gray-800/50">
-                        <td className="py-3 max-w-[200px] truncate text-gray-300 text-xs">{r.url}</td>
+                        <td className="max-w-[200px] truncate py-3 text-xs text-gray-300">
+                          {r.url}
+                        </td>
                         <td className="py-3 text-center font-black text-white">{r.score}</td>
                         <td className="py-3 text-center">
                           {r.isPrimary ? (
-                            <span className="text-gray-500 text-xs">baseline</span>
+                            <span className="text-xs text-gray-500">baseline</span>
                           ) : (
-                            <span className={cn('flex items-center justify-center gap-1 font-bold text-xs', delta > 0 ? 'text-red-400' : 'text-emerald-400')}>
-                              {delta > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                              {delta > 0 ? '+' : ''}{delta}
+                            <span
+                              className={cn(
+                                'flex items-center justify-center gap-1 text-xs font-bold',
+                                delta > 0 ? 'text-red-400' : 'text-emerald-400',
+                              )}
+                            >
+                              {delta > 0 ? (
+                                <TrendingUp className="h-3 w-3" />
+                              ) : (
+                                <TrendingDown className="h-3 w-3" />
+                              )}
+                              {delta > 0 ? '+' : ''}
+                              {delta}
                             </span>
                           )}
                         </td>

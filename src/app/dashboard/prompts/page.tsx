@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Plus, X, Play, Loader2, AlertCircle, MessageSquare, RefreshCw, Clock } from 'lucide-react'
+import { Plus, X, Play, Loader2, MessageSquare, Clock } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/index'
@@ -28,7 +28,10 @@ const CATEGORY_COLORS: Record<string, string> = {
 }
 
 function PromptCard({
-  prompt, onDelete, onRun, running,
+  prompt,
+  onDelete,
+  onRun,
+  running,
 }: {
   prompt: Prompt
   onDelete: (id: string) => void
@@ -42,15 +45,19 @@ function PromptCard({
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex-1">
           <div className="mb-1.5 flex flex-wrap gap-1.5">
-            <Badge variant={categoryColor as Parameters<typeof Badge>[0]['variant']}>{prompt.category ?? 'custom'}</Badge>
+            <Badge variant={categoryColor as Parameters<typeof Badge>[0]['variant']}>
+              {prompt.category ?? 'custom'}
+            </Badge>
             <Badge variant="default">{prompt.language}</Badge>
             {prompt.engines.map((e) => (
-              <Badge key={e} variant="default">{e}</Badge>
+              <Badge key={e} variant="default">
+                {e}
+              </Badge>
             ))}
           </div>
           <p className="text-sm font-medium text-gray-200">"{prompt.text}"</p>
         </div>
-        <div className="flex gap-1 shrink-0">
+        <div className="flex shrink-0 gap-1">
           <Button
             disabled={running}
             loading={running}
@@ -61,11 +68,7 @@ function PromptCard({
             {!running && <Play className="h-3.5 w-3.5 text-emerald-400" />}
             Run
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => onDelete(prompt.id)}
-          >
+          <Button size="icon" variant="ghost" onClick={() => onDelete(prompt.id)}>
             <X className="h-4 w-4 text-gray-600 hover:text-red-400" />
           </Button>
         </div>
@@ -74,10 +77,7 @@ function PromptCard({
       <div className="flex items-center justify-between text-xs text-gray-600">
         <div className="flex items-center gap-1.5">
           <Clock className="h-3 w-3" />
-          {prompt.last_run_at
-            ? `Last run ${formatRelativeTime(prompt.last_run_at)}`
-            : 'Never run'
-          }
+          {prompt.last_run_at ? `Last run ${formatRelativeTime(prompt.last_run_at)}` : 'Never run'}
         </div>
         <span className="capitalize">{prompt.run_frequency} schedule</span>
       </div>
@@ -111,8 +111,8 @@ export default function PromptsPage() {
         fetch('/api/brands'),
         fetch(`/api/prompts${selectedBrandId ? `?brand_id=${selectedBrandId}` : ''}`),
       ])
-      const bJson = await brandsRes.json() as { success: boolean; data?: Brand[] }
-      const pJson = await promptsRes.json() as { success: boolean; data?: Prompt[] }
+      const bJson = (await brandsRes.json()) as { success: boolean; data?: Brand[] }
+      const pJson = (await promptsRes.json()) as { success: boolean; data?: Prompt[] }
       setBrands(bJson.data ?? [])
       setPrompts(pJson.data ?? [])
     } catch {
@@ -122,7 +122,9 @@ export default function PromptsPage() {
     }
   }, [selectedBrandId])
 
-  useEffect(() => { void loadData() }, [loadData])
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleCreate = async () => {
     if (!form.text.trim() || !selectedBrandId) {
@@ -136,11 +138,17 @@ export default function PromptsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, brand_id: selectedBrandId }),
       })
-      const json = await res.json() as { success: boolean; data?: Prompt; message?: string }
+      const json = (await res.json()) as { success: boolean; data?: Prompt; message?: string }
       if (!json.success) throw new Error(json.message)
       setPrompts((prev) => [json.data!, ...prev])
       setShowForm(false)
-      setForm({ text: '', category: 'awareness', engines: ['chatgpt', 'gemini', 'perplexity'], language: 'en', run_frequency: 'daily' })
+      setForm({
+        text: '',
+        category: 'awareness',
+        engines: ['chatgpt', 'gemini', 'perplexity'],
+        language: 'en',
+        run_frequency: 'daily',
+      })
       toast.success('Prompt created')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create prompt')
@@ -151,7 +159,7 @@ export default function PromptsPage() {
 
   const handleDelete = async (id: string) => {
     const res = await fetch(`/api/prompts?id=${id}`, { method: 'DELETE' })
-    const json = await res.json() as { success: boolean }
+    const json = (await res.json()) as { success: boolean }
     if (json.success) {
       setPrompts((prev) => prev.filter((p) => p.id !== id))
       toast.success('Prompt deleted')
@@ -166,7 +174,11 @@ export default function PromptsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt_id: promptId }),
       })
-      const json = await res.json() as { success: boolean; data?: { results: unknown[] }; message?: string }
+      const json = (await res.json()) as {
+        success: boolean
+        data?: { results: unknown[] }
+        message?: string
+      }
       if (!json.success) throw new Error(json.message)
       toast.success(`Monitoring complete: ${json.data?.results?.length ?? 0} results saved`)
       void loadData()
@@ -203,7 +215,12 @@ export default function PromptsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Brand:</span>
           <button
-            className={cn('rounded-xl border px-3 py-1.5 text-xs font-bold transition-all', !selectedBrandId ? 'border-brand-500/50 bg-brand-500/15 text-brand-400' : 'border-gray-800 text-gray-500 hover:text-gray-300')}
+            className={cn(
+              'rounded-xl border px-3 py-1.5 text-xs font-bold transition-all',
+              !selectedBrandId
+                ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
+                : 'border-gray-800 text-gray-500 hover:text-gray-300',
+            )}
             onClick={() => setSelectedBrandId('')}
           >
             All
@@ -211,7 +228,12 @@ export default function PromptsPage() {
           {brands.map((b) => (
             <button
               key={b.id}
-              className={cn('rounded-xl border px-3 py-1.5 text-xs font-bold transition-all', selectedBrandId === b.id ? 'border-brand-500/50 bg-brand-500/15 text-brand-400' : 'border-gray-800 text-gray-500 hover:text-gray-300')}
+              className={cn(
+                'rounded-xl border px-3 py-1.5 text-xs font-bold transition-all',
+                selectedBrandId === b.id
+                  ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
+                  : 'border-gray-800 text-gray-500 hover:text-gray-300',
+              )}
               onClick={() => setSelectedBrandId(b.id)}
             >
               {b.name}
@@ -222,33 +244,48 @@ export default function PromptsPage() {
 
       {/* Create form */}
       {showForm && (
-        <Card className="p-6 border-brand-500/30 animate-in">
+        <Card className="animate-in border-brand-500/30 p-6">
           <h2 className="mb-5 text-base font-bold text-white">Create New Prompt</h2>
           <div className="space-y-4">
             {/* Brand select */}
             <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Brand *</label>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+                Brand *
+              </label>
               <select
                 className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-brand-500"
                 value={selectedBrandId}
                 onChange={(e) => setSelectedBrandId(e.target.value)}
               >
                 <option value="">Select brand...</option>
-                {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
               </select>
             </div>
 
             {/* Templates */}
             <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Quick Templates</label>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+                Quick Templates
+              </label>
               <div className="flex flex-wrap gap-2">
                 {PROMPT_TEMPLATES.map((t, i) => (
                   <button
                     key={i}
                     className="rounded-lg border border-gray-800 bg-gray-900/50 px-2.5 py-1 text-xs text-gray-400 transition-colors hover:border-brand-500/30 hover:text-brand-400"
                     onClick={() => {
-                      const brandName = brands.find((b) => b.id === selectedBrandId)?.name ?? 'YourBrand'
-                      setForm((f) => ({ ...f, text: t.text.replace('[brand]', brandName).replace('[competitor]', 'competitor'), category: t.category as Prompt['category'] }))
+                      const brandName =
+                        brands.find((b) => b.id === selectedBrandId)?.name ?? 'YourBrand'
+                      setForm((f) => ({
+                        ...f,
+                        text: t.text
+                          .replace('[brand]', brandName)
+                          .replace('[competitor]', 'competitor'),
+                        category: t.category as Prompt['category'],
+                      }))
                     }}
                   >
                     {t.text}
@@ -259,7 +296,9 @@ export default function PromptsPage() {
 
             {/* Prompt text */}
             <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Prompt Text *</label>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+                Prompt Text *
+              </label>
               <textarea
                 className="w-full resize-none rounded-xl border border-gray-800 bg-black/40 px-4 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-brand-500"
                 placeholder="e.g. What are the best AI monitoring tools?"
@@ -272,34 +311,53 @@ export default function PromptsPage() {
             <div className="grid grid-cols-2 gap-4">
               {/* Category */}
               <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Category</label>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+                  Category
+                </label>
                 <select
                   className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-brand-500"
                   value={form.category ?? 'custom'}
-                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as Prompt['category'] }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, category: e.target.value as Prompt['category'] }))
+                  }
                 >
                   {['awareness', 'comparison', 'alternative', 'features', 'custom'].map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
                   ))}
                 </select>
               </div>
 
               {/* Frequency */}
               <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Run Frequency</label>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+                  Run Frequency
+                </label>
                 <select
                   className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-brand-500"
                   value={form.run_frequency}
-                  onChange={(e) => setForm((f) => ({ ...f, run_frequency: e.target.value as Prompt['run_frequency'] }))}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      run_frequency: e.target.value as Prompt['run_frequency'],
+                    }))
+                  }
                 >
-                  {['hourly', 'daily', 'weekly'].map((f) => <option key={f} value={f}>{f}</option>)}
+                  {['hourly', 'daily', 'weekly'].map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
 
             {/* Engines */}
             <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">Engines to Monitor</label>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500">
+                Engines to Monitor
+              </label>
               <div className="flex gap-2">
                 {(['chatgpt', 'gemini', 'perplexity'] as MonitoringEngine[]).map((engine) => (
                   <button
@@ -319,7 +377,9 @@ export default function PromptsPage() {
             </div>
 
             <div className="flex justify-end gap-3 border-t border-gray-800 pt-4">
-              <Button variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setShowForm(false)}>
+                Cancel
+              </Button>
               <Button loading={creating} onClick={handleCreate}>
                 <Plus className="h-4 w-4" /> Create Prompt
               </Button>
@@ -330,12 +390,16 @@ export default function PromptsPage() {
 
       {/* Prompts list */}
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-brand-400" /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-brand-400" />
+        </div>
       ) : prompts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <MessageSquare className="mb-4 h-16 w-16 text-gray-800" />
           <h2 className="mb-2 text-xl font-bold text-white">No prompts yet</h2>
-          <p className="text-gray-500">Create your first prompt to start monitoring AI responses.</p>
+          <p className="text-gray-500">
+            Create your first prompt to start monitoring AI responses.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">

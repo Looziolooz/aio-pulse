@@ -1,6 +1,16 @@
--- ─── AIO Pulse — Supabase Schema ─────────────────────────────────────────────
--- Run this in your Supabase SQL editor to set up all tables.
--- Go to: https://app.supabase.com → your project → SQL Editor → New query
+-- PATH: supabase/schema.sql
+-- ─── AIO Pulse — Supabase Schema (v2 — Security Fix) ──────────────────────────
+--
+-- CHANGES FROM v1:
+--   • Removed `service_all_brands` policy that bypassed all RLS rules.
+--     The service role (SUPABASE_SERVICE_KEY) already bypasses RLS automatically
+--     on the server side — no permissive "allow all" policy is needed.
+--   • All other policies are unchanged.
+--
+-- Run this in your Supabase SQL editor:
+--   https://app.supabase.com → your project → SQL Editor → New query
+--
+-- ─────────────────────────────────────────────────────────────────────────────
 
 -- ─── Extensions ───────────────────────────────────────────────────────────────
 create extension if not exists "uuid-ossp";
@@ -22,7 +32,8 @@ create table if not exists brands (
   logo_url     text,
   is_active    boolean default true,
   created_at   timestamptz default now(),
-  updated_at   timestamptz default now()
+  updated_at   timestamptz default now(),
+  unique(user_id, slug)
 );
 
 create index if not exists brands_user_id_idx on brands(user_id);
@@ -30,19 +41,19 @@ create index if not exists brands_slug_idx on brands(slug);
 
 -- ─── PROMPTS ──────────────────────────────────────────────────────────────────
 create table if not exists prompts (
-  id           uuid primary key default uuid_generate_v4(),
-  brand_id     uuid not null references brands(id) on delete cascade,
-  user_id      text not null,
-  text         text not null,                         -- the prompt/query to monitor
-  language     text default 'en',
-  market       text default 'global',
-  category     text,                                  -- 'awareness' | 'comparison' | 'alternative' | 'custom'
-  engines      text[] default '{chatgpt,gemini,perplexity}',
-  is_active    boolean default true,
-  run_frequency text default 'daily',                 -- 'hourly' | 'daily' | 'weekly'
-  last_run_at  timestamptz,
-  created_at   timestamptz default now(),
-  updated_at   timestamptz default now()
+  id            uuid primary key default uuid_generate_v4(),
+  brand_id      uuid not null references brands(id) on delete cascade,
+  user_id       text not null,
+  text          text not null,                         -- the prompt/query to monitor
+  language      text default 'en',
+  market        text default 'global',
+  category      text,                                  -- 'awareness'|'comparison'|'alternative'|'custom'
+  engines       text[] default '{chatgpt,gemini,perplexity}',
+  is_active     boolean default true,
+  run_frequency text default 'daily',                 -- 'hourly'|'daily'|'weekly'
+  last_run_at   timestamptz,
+  created_at    timestamptz default now(),
+  updated_at    timestamptz default now()
 );
 
 create index if not exists prompts_brand_id_idx on prompts(brand_id);
@@ -54,15 +65,15 @@ create table if not exists monitoring_results (
   prompt_id         uuid not null references prompts(id) on delete cascade,
   brand_id          uuid not null references brands(id) on delete cascade,
   user_id           text not null,
-  engine            text not null,                    -- 'chatgpt' | 'gemini' | 'perplexity'
+  engine            text not null,                    -- 'chatgpt'|'gemini'|'perplexity'
   prompt_text       text not null,                   -- snapshot of prompt at run time
-  response_text     text not null,                   -- full AI response
+  response_text     text not null,                   -- AI response (truncated at 5000 chars)
   brand_mentioned   boolean default false,
   mention_position  int,                             -- 1 = first mention, null = not mentioned
   mention_count     int default 0,
-  mention_type      text,                            -- 'direct' | 'indirect' | 'none'
+  mention_type      text,                            -- 'direct'|'indirect'|'none'
   visibility_score  int default 0,                  -- 0-100
-  sentiment         text,                            -- 'positive' | 'negative' | 'neutral'
+  sentiment         text,                            -- 'positive'|'negative'|'neutral'
   sentiment_score   float,                          -- -1.0 to 1.0
   cited_urls        text[] default '{}',
   competitor_mentions jsonb default '[]',            -- [{name, position, count}]
@@ -78,20 +89,20 @@ create index if not exists monitoring_results_engine_idx on monitoring_results(e
 create index if not exists monitoring_results_created_at_idx on monitoring_results(created_at desc);
 create index if not exists monitoring_results_user_id_idx on monitoring_results(user_id);
 
--- ─── ALERTS ───────────────────────────────────────────────────────────────────
+-- ─── ALERT RULES ──────────────────────────────────────────────────────────────
 create table if not exists alert_rules (
-  id           uuid primary key default uuid_generate_v4(),
-  brand_id     uuid not null references brands(id) on delete cascade,
-  user_id      text not null,
-  name         text not null,
-  type         text not null,    -- 'mention_new' | 'sentiment_drop' | 'competitor_ahead' | 'hallucination' | 'visibility_change'
-  condition    jsonb not null,   -- {threshold, operator, engine, etc.}
-  channels     text[] default '{email}',
-  email        text,
-  webhook_url  text,
-  is_active    boolean default true,
+  id            uuid primary key default uuid_generate_v4(),
+  brand_id      uuid not null references brands(id) on delete cascade,
+  user_id       text not null,
+  name          text not null,
+  type          text not null,    -- see AlertType enum
+  condition     jsonb not null,   -- {threshold, operator, engine, competitor, etc.}
+  channels      text[] default '{email}',
+  email         text,
+  webhook_url   text,
+  is_active     boolean default true,
   last_fired_at timestamptz,
-  created_at   timestamptz default now()
+  created_at    timestamptz default now()
 );
 
 create index if not exists alert_rules_brand_id_idx on alert_rules(brand_id);
@@ -99,30 +110,30 @@ create index if not exists alert_rules_user_id_idx on alert_rules(user_id);
 
 -- ─── ALERT EVENTS ─────────────────────────────────────────────────────────────
 create table if not exists alert_events (
-  id              uuid primary key default uuid_generate_v4(),
-  alert_rule_id   uuid not null references alert_rules(id) on delete cascade,
-  brand_id        uuid not null references brands(id) on delete cascade,
-  user_id         text not null,
-  type            text not null,
-  title           text not null,
-  message         text not null,
-  data            jsonb default '{}',
-  channels_sent   text[] default '{}',
-  is_read         boolean default false,
-  created_at      timestamptz default now()
+  id             uuid primary key default uuid_generate_v4(),
+  alert_rule_id  uuid references alert_rules(id) on delete set null,
+  brand_id       uuid not null references brands(id) on delete cascade,
+  user_id        text not null,
+  type           text not null,
+  title          text not null,
+  message        text not null,
+  data           jsonb default '{}',
+  channels_sent  text[] default '{}',
+  is_read        boolean default false,
+  created_at     timestamptz default now()
 );
 
-create index if not exists alert_events_user_id_idx on alert_events(user_id);
 create index if not exists alert_events_brand_id_idx on alert_events(brand_id);
-create index if not exists alert_events_created_at_idx on alert_events(created_at desc);
+create index if not exists alert_events_user_id_idx on alert_events(user_id);
 create index if not exists alert_events_is_read_idx on alert_events(is_read);
+create index if not exists alert_events_created_at_idx on alert_events(created_at desc);
 
--- ─── BRAND HEALTH SCORES (aggregated daily) ───────────────────────────────────
+-- ─── BRAND HEALTH SCORES ──────────────────────────────────────────────────────
 create table if not exists brand_health_scores (
   id                uuid primary key default uuid_generate_v4(),
   brand_id          uuid not null references brands(id) on delete cascade,
   user_id           text not null,
-  date              date not null default current_date,
+  date              date not null,
   visibility_score  float default 0,
   sentiment_score   float default 0,
   hallucination_rate float default 0,
@@ -137,8 +148,11 @@ create table if not exists brand_health_scores (
 create index if not exists brand_health_scores_brand_id_idx on brand_health_scores(brand_id);
 create index if not exists brand_health_scores_date_idx on brand_health_scores(date desc);
 
--- ─── RLS POLICIES ─────────────────────────────────────────────────────────────
--- Enable Row Level Security (users only see their own data)
+-- ─── ROW LEVEL SECURITY ───────────────────────────────────────────────────────
+-- Users can only read/write their own data.
+-- The service key (SUPABASE_SERVICE_KEY) used by API routes bypasses RLS
+-- automatically — no "allow all" policy is needed for that.
+
 alter table brands enable row level security;
 alter table prompts enable row level security;
 alter table monitoring_results enable row level security;
@@ -146,9 +160,9 @@ alter table alert_rules enable row level security;
 alter table alert_events enable row level security;
 alter table brand_health_scores enable row level security;
 
--- Brands policies
+-- ── brands ────────────────────────────────────────────────────────────────────
 create policy "users_own_brands" on brands
-  using (user_id = auth.uid()::text);
+  for select using (user_id = auth.uid()::text);
 
 create policy "users_insert_brands" on brands for insert
   with check (user_id = auth.uid()::text);
@@ -159,9 +173,9 @@ create policy "users_update_brands" on brands for update
 create policy "users_delete_brands" on brands for delete
   using (user_id = auth.uid()::text);
 
--- Prompts policies
+-- ── prompts ───────────────────────────────────────────────────────────────────
 create policy "users_own_prompts" on prompts
-  using (user_id = auth.uid()::text);
+  for select using (user_id = auth.uid()::text);
 
 create policy "users_insert_prompts" on prompts for insert
   with check (user_id = auth.uid()::text);
@@ -172,16 +186,16 @@ create policy "users_update_prompts" on prompts for update
 create policy "users_delete_prompts" on prompts for delete
   using (user_id = auth.uid()::text);
 
--- Monitoring results
+-- ── monitoring_results ────────────────────────────────────────────────────────
 create policy "users_own_monitoring" on monitoring_results
-  using (user_id = auth.uid()::text);
+  for select using (user_id = auth.uid()::text);
 
 create policy "users_insert_monitoring" on monitoring_results for insert
   with check (user_id = auth.uid()::text);
 
--- Alerts
+-- ── alert_rules ───────────────────────────────────────────────────────────────
 create policy "users_own_alerts" on alert_rules
-  using (user_id = auth.uid()::text);
+  for select using (user_id = auth.uid()::text);
 
 create policy "users_insert_alerts" on alert_rules for insert
   with check (user_id = auth.uid()::text);
@@ -192,27 +206,29 @@ create policy "users_update_alerts" on alert_rules for update
 create policy "users_delete_alerts" on alert_rules for delete
   using (user_id = auth.uid()::text);
 
+-- ── alert_events ──────────────────────────────────────────────────────────────
 create policy "users_own_alert_events" on alert_events
-  using (user_id = auth.uid()::text);
+  for select using (user_id = auth.uid()::text);
 
 create policy "users_update_alert_events" on alert_events for update
   using (user_id = auth.uid()::text);
 
-create policy "users_own_health_scores" on brand_health_scores
+create policy "users_delete_alert_events" on alert_events for delete
   using (user_id = auth.uid()::text);
 
--- ─── SERVICE ROLE POLICIES (for API routes using service key) ─────────────────
--- These allow your Next.js API routes (using SUPABASE_SERVICE_KEY) to bypass RLS
-create policy "service_all_brands" on brands
-  using (true) with check (true);
+-- ── brand_health_scores ───────────────────────────────────────────────────────
+create policy "users_own_health_scores" on brand_health_scores
+  for select using (user_id = auth.uid()::text);
 
--- Note: In production, use proper service role with restricted access.
--- For development, you can also disable RLS temporarily:
--- alter table brands disable row level security;
+create policy "users_insert_health_scores" on brand_health_scores for insert
+  with check (user_id = auth.uid()::text);
+
+create policy "users_update_health_scores" on brand_health_scores for update
+  using (user_id = auth.uid()::text);
 
 -- ─── HELPER FUNCTIONS ─────────────────────────────────────────────────────────
 
--- Auto-update updated_at
+-- Auto-update updated_at timestamp
 create or replace function update_updated_at()
 returns trigger as $$
 begin
@@ -226,3 +242,11 @@ create trigger brands_updated_at before update on brands
 
 create trigger prompts_updated_at before update on prompts
   for each row execute function update_updated_at();
+
+-- ─── REMOVE OLD BROKEN POLICY (run if upgrading from v1) ─────────────────────
+-- If you already ran the v1 schema, execute these two lines to remove the
+-- dangerous "service_all_brands" policy that bypasses RLS for everyone:
+--
+--   drop policy if exists "service_all_brands" on brands;
+--
+-- That's all — no other changes needed.

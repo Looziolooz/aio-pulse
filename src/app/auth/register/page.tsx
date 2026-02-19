@@ -1,67 +1,86 @@
-// PATH: src/app/auth/login/page.tsx
+// PATH: src/app/auth/register/page.tsx
 'use client'
 
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Shield, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react'
 import { APP_NAME } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
-import { loginSchema } from '@/lib/validations'
+import { registerSchema } from '@/lib/validations'
 
-export default function LoginPage() {
-  const router = useRouter()
-
+export default function RegisterPage() {
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
 
-    // ── Client-side validation ────────────────────────────────────────────────
-    const parsed = loginSchema.safeParse({ email, password })
+    // ── Validate ──────────────────────────────────────────────────────────────
+    const parsed = registerSchema.safeParse({ name, email, password, confirmPassword })
     if (!parsed.success) {
-      const firstError = parsed.error.flatten().fieldErrors
-      const msg = Object.values(firstError).flat()[0] ?? 'Invalid input'
-      setError(msg)
+      const firstError = Object.values(parsed.error.flatten().fieldErrors).flat()[0]
+      setError(firstError ?? 'Invalid input')
       return
     }
 
     setLoading(true)
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { error: signUpError } = await supabase.auth.signUp({
         email: parsed.data.email,
         password: parsed.data.password,
+        options: {
+          data: { name: parsed.data.name },
+        },
       })
 
-      if (authError) {
-        // Provide user-friendly messages for common errors
-        if (authError.message.includes('Invalid login credentials')) {
-          setError('Incorrect email or password. Please try again.')
-        } else if (authError.message.includes('Email not confirmed')) {
-          setError('Please verify your email address before signing in.')
+      if (signUpError) {
+        if (signUpError.message.includes('already registered')) {
+          setError('This email is already registered. Try signing in instead.')
         } else {
-          setError(authError.message)
+          setError(signUpError.message)
         }
         return
       }
 
-      // Success — redirect to dashboard
-      router.push('/dashboard')
-      router.refresh()
+      // Supabase sends a confirmation email — show success state
+      setSuccess(true)
     } catch (err) {
-      console.error('[login] Unexpected error:', err)
+      console.error('[register] Unexpected error:', err)
       setError('An unexpected error occurred. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  // ── Success state ─────────────────────────────────────────────────────────
+  if (success) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-950 px-6">
+        <div className="w-full max-w-sm text-center">
+          <CheckCircle2 className="mx-auto mb-4 h-16 w-16 text-emerald-500" />
+          <h1 className="mb-2 text-2xl font-black text-white">Check your inbox</h1>
+          <p className="mb-6 text-sm text-gray-400">
+            We sent a verification link to <strong className="text-white">{email}</strong>. Click
+            the link to activate your account.
+          </p>
+          <Link
+            className="inline-block rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-brand-500"
+            href="/auth/login"
+          >
+            Back to Sign In
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -78,13 +97,12 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tight text-white">{APP_NAME}</h1>
-            <p className="mt-1 text-sm text-gray-400">Sign in to your account</p>
+            <p className="mt-1 text-sm text-gray-400">Create your account</p>
           </div>
         </div>
 
         {/* Card */}
         <div className="glass rounded-2xl p-8">
-          {/* Error banner */}
           {error && (
             <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
               {error}
@@ -92,6 +110,23 @@ export default function LoginPage() {
           )}
 
           <form className="space-y-5" onSubmit={handleSubmit}>
+            {/* Name */}
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-400">
+                Full Name
+              </label>
+              <input
+                required
+                autoComplete="name"
+                className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-3 text-sm text-white placeholder-gray-600 outline-none transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                disabled={loading}
+                placeholder="Your Name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+
             {/* Email */}
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-400">
@@ -117,10 +152,11 @@ export default function LoginPage() {
               <div className="relative">
                 <input
                   required
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-3 pr-11 text-sm text-white placeholder-gray-600 outline-none transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                   disabled={loading}
-                  placeholder="••••••••"
+                  minLength={8}
+                  placeholder="Min. 8 characters"
                   type={showPw ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -135,23 +171,21 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Remember me + Forgot password */}
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex cursor-pointer items-center gap-2 text-gray-400">
-                <input
-                  checked={rememberMe}
-                  className="rounded"
-                  type="checkbox"
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                />
-                Remember me
+            {/* Confirm Password */}
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-400">
+                Confirm Password
               </label>
-              <Link
-                className="text-brand-400 transition-colors hover:text-brand-300"
-                href="/auth/forgot-password"
-              >
-                Forgot password?
-              </Link>
+              <input
+                required
+                autoComplete="new-password"
+                className="w-full rounded-xl border border-gray-800 bg-black/40 px-4 py-3 text-sm text-white placeholder-gray-600 outline-none transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                disabled={loading}
+                placeholder="••••••••"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
             </div>
 
             {/* Submit */}
@@ -163,33 +197,21 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in…
+                  Creating account…
                 </>
               ) : (
-                'Sign In'
+                'Create Account'
               )}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-500">
-            Don&apos;t have an account?{' '}
-            <Link className="font-semibold text-brand-400 hover:text-brand-300" href="/auth/register">
-              Create one
+            Already have an account?{' '}
+            <Link className="font-semibold text-brand-400 hover:text-brand-300" href="/auth/login">
+              Sign in
             </Link>
           </p>
         </div>
-
-        <p className="mt-6 text-center text-xs text-gray-600">
-          By signing in, you agree to our{' '}
-          <Link className="underline hover:text-gray-400" href="#">
-            Terms
-          </Link>{' '}
-          and{' '}
-          <Link className="underline hover:text-gray-400" href="#">
-            Privacy Policy
-          </Link>
-          .
-        </p>
       </div>
     </div>
   )
