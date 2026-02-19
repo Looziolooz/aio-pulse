@@ -1,6 +1,5 @@
 // PATH: src/lib/services/monitoring.ts
-// VERSIONE AGGIORNATA — usa ai-router.ts per fallback automatico multi-provider.
-
+import { z } from 'zod'
 import type {
   MonitoringEngine,
   MonitoringResult,
@@ -22,20 +21,41 @@ function parseJson<T>(raw: string): T {
   return JSON.parse(cleaned) as T
 }
 
-interface AnalysisOutput {
-  brand_mentioned: boolean
-  mention_position: number | null
-  mention_count: number
-  mention_type: MentionType
-  visibility_score: number
-  sentiment: SentimentLabel
-  sentiment_score: number
-  sentiment_reasoning: string
-  cited_urls: string[]
-  competitor_mentions: CompetitorMention[]
-  has_hallucination: boolean
-  hallucination_flags: HallucinationFlag[]
-}
+// ─── Zod schema per validare la risposta AI ───────────────────────────────────
+const analysisOutputSchema = z.object({
+  brand_mentioned: z.boolean(),
+  mention_position: z.number().int().positive().nullable().optional(),
+  mention_count: z.number().int().min(0).default(0),
+  mention_type: z.enum(['direct', 'indirect', 'none']).default('none'),
+  visibility_score: z.number().min(0).max(100),
+  sentiment: z.enum(['positive', 'negative', 'neutral']).default('neutral'),
+  sentiment_score: z.number().min(-1).max(1).default(0),
+  sentiment_reasoning: z.string().optional().default(''),
+  cited_urls: z.array(z.string()).optional().default([]),
+  competitor_mentions: z
+    .array(
+      z.object({
+        name: z.string(),
+        position: z.number().int(),
+        count: z.number().int(),
+      }),
+    )
+    .optional()
+    .default([]),
+  has_hallucination: z.boolean().default(false),
+  hallucination_flags: z
+    .array(
+      z.object({
+        text: z.string(),
+        severity: z.enum(['low', 'medium', 'high']),
+        type: z.enum(['factual_error', 'attribution_error', 'fabrication', 'date_error']),
+      }),
+    )
+    .optional()
+    .default([]),
+})
+
+type AnalysisOutput = z.infer<typeof analysisOutputSchema>
 
 function buildAnalysisPrompt(responseText: string, brand: Brand, promptText: string): string {
   return `You are an AI brand monitoring analyst. Analyze this AI-generated response for mentions and sentiment about the brand "${brand.name}".
@@ -86,12 +106,10 @@ export async function runMonitoringCheck(
   engine: MonitoringEngine,
   userId: string,
 ): Promise<Omit<MonitoringResult, 'id' | 'created_at'>> {
-  // Step 1: simula risposta engine
   const { text: responseText, provider: simulationProvider } =
     await routerSimulate(prompt.text, engine)
   console.log(`[monitoring] ${engine} simulato con: ${simulationProvider}`)
 
-  // Step 2: analizza per metriche brand
   const analysisPrompt = buildAnalysisPrompt(responseText, brand, prompt.text)
   const { text: analysisRaw, provider: analysisProvider } =
     await routerAnalyze(analysisPrompt)
@@ -99,10 +117,13 @@ export async function runMonitoringCheck(
 
   let analysis: AnalysisOutput
   try {
-    analysis = parseJson<AnalysisOutput>(analysisRaw)
-  } catch {
+    const rawParsed = parseJson<unknown>(analysisRaw)
+    // Zod valida e applica defaults — nessun campo silenziosamente undefined
+    analysis = analysisOutputSchema.parse(rawParsed)
+  } catch (e) {
     throw new Error(
-      `Impossibile parsare la risposta di analisi da ${analysisProvider}. ` +
+      `Impossibile parsare/validare la risposta di analisi da ${analysisProvider}. ` +
+        `Errore: ${e instanceof Error ? e.message : String(e)}. ` +
         `Raw: ${analysisRaw.slice(0, 200)}`,
     )
   }
@@ -116,16 +137,16 @@ export async function runMonitoringCheck(
     response_text:
       responseText.length > 5000 ? responseText.slice(0, 5000) + '…' : responseText,
     brand_mentioned: analysis.brand_mentioned,
-    mention_position: analysis.mention_position,
+    mention_position: analysis.mention_position ?? null,
     mention_count: analysis.mention_count,
-    mention_type: analysis.mention_type,
+    mention_type: analysis.mention_type as MentionType,
     visibility_score: Math.min(100, Math.max(0, analysis.visibility_score)),
-    sentiment: analysis.sentiment,
+    sentiment: analysis.sentiment as SentimentLabel,
     sentiment_score: Math.min(1, Math.max(-1, analysis.sentiment_score)),
-    cited_urls: analysis.cited_urls ?? [],
-    competitor_mentions: analysis.competitor_mentions ?? [],
+    cited_urls: analysis.cited_urls,
+    competitor_mentions: analysis.competitor_mentions as CompetitorMention[],
     has_hallucination: analysis.has_hallucination,
-    hallucination_flags: analysis.hallucination_flags ?? [],
+    hallucination_flags: analysis.hallucination_flags as HallucinationFlag[],
   }
 }
 
@@ -218,15 +239,14 @@ Respond ONLY with valid JSON (no markdown):
 }
 
 // ─── calculateHealthScore ─────────────────────────────────────────────────────
-// BUG FIX: versione corretta senza overflow negativo
 
 export function calculateHealthScore(
-  visibilityScore: number,    // 0 – 100
-  sentimentScore: number,     // -1 – 1
-  hallucinationRate: number,  // 0 – 1
+  visibilityScore: number,
+  sentimentScore: number,
+  hallucinationRate: number,
 ): number {
-  const sentimentNorm = ((sentimentScore + 1) / 2) * 100  // → 0-100
-  const hallucinationPenalty = hallucinationRate * 30     // max 30 punti sottratti
+  const sentimentNorm = ((sentimentScore + 1) / 2) * 100
+  const hallucinationPenalty = hallucinationRate * 30
 
   const raw =
     visibilityScore * 0.5 +

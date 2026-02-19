@@ -5,14 +5,12 @@ const supabaseUrl = process.env['NEXT_PUBLIC_SUPABASE_URL']
 const supabaseAnonKey = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']
 const supabaseServiceKey = process.env['SUPABASE_SERVICE_KEY']
 
-// Preveniamo crash durante il build se le variabili mancano in locale
 const isConfigured = !!supabaseUrl && !!supabaseAnonKey
 
 if (!isConfigured && process.env.NODE_ENV === 'production') {
   console.warn('⚠️ Warning: Supabase environment variables are missing in production.')
 }
 
-// Browser client (anon key)
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder',
@@ -21,7 +19,6 @@ export const supabase = createClient(
   },
 )
 
-// Server client (service key) - SOLO per API routes
 export function createServerClient() {
   if (!supabaseServiceKey || !supabaseUrl) {
     throw new Error('SUPABASE_SERVICE_KEY is not set. Check your Vercel variables.')
@@ -42,9 +39,10 @@ export class AuthError extends Error {
 }
 
 export async function getCurrentUserId(authHeader?: string | null): Promise<string> {
-  const devId = process.env['DEV_USER_ID']
-  if (devId && devId.trim().length > 0) {
-    return devId.trim()
+  // DEV bypass: SOLO in development, mai in production
+  if (process.env.NODE_ENV !== 'production') {
+    const devId = process.env['DEV_USER_ID']
+    if (devId?.trim()) return devId.trim()
   }
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -53,7 +51,7 @@ export async function getCurrentUserId(authHeader?: string | null): Promise<stri
 
   const token = authHeader.replace('Bearer ', '').trim()
   const { data, error } = await supabase.auth.getUser(token)
-  
+
   if (error || !data.user) {
     throw new AuthError('Invalid or expired token', 401)
   }
@@ -61,7 +59,6 @@ export async function getCurrentUserId(authHeader?: string | null): Promise<stri
   return data.user.id
 }
 
-// Fix ESLint no-explicit-any: definiamo l'interfaccia per il contesto della rotta
 interface RouteContext {
   params: Record<string, string | string[] | undefined>
 }

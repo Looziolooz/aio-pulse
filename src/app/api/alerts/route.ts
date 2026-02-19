@@ -3,6 +3,28 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient, getCurrentUserId, AuthError } from '@/lib/supabase'
 
+// ─── Webhook URL validator (blocca SSRF) ──────────────────────────────────────
+function isSafeWebhookUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url)
+    const blocked = [
+      'localhost',
+      '127.0.0.1',
+      '0.0.0.0',
+      '::1',
+      '169.254.169.254', // AWS metadata
+      'metadata.google.internal', // GCP metadata
+    ]
+    if (blocked.includes(hostname)) return false
+    if (hostname.startsWith('192.168.')) return false
+    if (hostname.startsWith('10.')) return false
+    if (hostname.startsWith('172.16.') || hostname.startsWith('172.31.')) return false
+    return true
+  } catch {
+    return false
+  }
+}
+
 // ─── Validation schemas ───────────────────────────────────────────────────────
 
 const alertConditionSchema = z.object({
@@ -28,10 +50,14 @@ const createAlertSchema = z.object({
   condition: alertConditionSchema,
   channels: z.array(z.string()).default(['email']),
   email: z.string().email().optional().nullable(),
-  webhook_url: z.string().url().optional().nullable(),
+  webhook_url: z
+    .string()
+    .url()
+    .refine(isSafeWebhookUrl, 'Webhook URL must be a public internet address')
+    .optional()
+    .nullable(),
 })
 
-// Partial schema for full update (PUT without action param)
 const updateAlertSchema = createAlertSchema.partial().omit({ brand_id: true })
 
 // ─── Helper: auth + db setup ──────────────────────────────────────────────────
@@ -47,9 +73,6 @@ function err(message: string, status = 500) {
 }
 
 // ─── GET /api/alerts ──────────────────────────────────────────────────────────
-// ?type=rules    → returns alert rules for the user         (default)
-// ?type=events   → returns alert events (notifications)
-// ?brand_id=uuid → filter by brand
 export async function GET(req: NextRequest) {
   let userId: string
   let db: ReturnType<typeof createServerClient>
@@ -64,7 +87,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const brandId = searchParams.get('brand_id')
-  const type = searchParams.get('type') // 'rules' | 'events'
+  const type = searchParams.get('type')
 
   if (type === 'events') {
     let query = db
@@ -81,7 +104,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, data, timestamp: Date.now() })
   }
 
-  // Default: return alert rules
   let query = db
     .from('alert_rules')
     .select('*, brand:brands(name, color, slug)')
@@ -96,7 +118,6 @@ export async function GET(req: NextRequest) {
 }
 
 // ─── POST /api/alerts ─────────────────────────────────────────────────────────
-// Creates a new alert rule.
 export async function POST(req: NextRequest) {
   let userId: string
   let db: ReturnType<typeof createServerClient>
@@ -128,7 +149,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Verify brand ownership — prevent users from attaching rules to other users' brands
   const { data: brand } = await db
     .from('brands')
     .select('id')
@@ -151,9 +171,6 @@ export async function POST(req: NextRequest) {
 }
 
 // ─── PUT /api/alerts ──────────────────────────────────────────────────────────
-// ?id=uuid&action=read    → mark alert event as read
-// ?id=uuid&action=toggle  → toggle alert rule is_active
-// ?id=uuid                → full update of an alert rule (body validated with Zod)
 export async function PUT(req: NextRequest) {
   let userId: string
   let db: ReturnType<typeof createServerClient>
@@ -168,11 +185,10 @@ export async function PUT(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
-  const action = searchParams.get('action') // 'read' | 'toggle'
+  const action = searchParams.get('action')
 
   if (!id) return err('id query parameter is required', 400)
 
-  // ── Mark event as read ────────────────────────────────────────────────────
   if (action === 'read') {
     const { error } = await db
       .from('alert_events')
@@ -184,7 +200,6 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ success: true, data: null, timestamp: Date.now() })
   }
 
-  // ── Toggle rule active/paused ─────────────────────────────────────────────
   if (action === 'toggle') {
     const { data: rule } = await db
       .from('alert_rules')
@@ -207,7 +222,6 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ success: true, data, timestamp: Date.now() })
   }
 
-  // ── Full update (with Zod validation) ─────────────────────────────────────
   let body: unknown
   try {
     body = await req.json()
@@ -240,8 +254,6 @@ export async function PUT(req: NextRequest) {
 }
 
 // ─── DELETE /api/alerts ───────────────────────────────────────────────────────
-// ?id=uuid&type=rule   → delete alert rule
-// ?id=uuid&type=event  → delete alert event
 export async function DELETE(req: NextRequest) {
   let userId: string
   let db: ReturnType<typeof createServerClient>
@@ -256,7 +268,7 @@ export async function DELETE(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
-  const type = searchParams.get('type') // 'rule' | 'event'
+  const type = searchParams.get('type')
 
   if (!id) return err('id query parameter is required', 400)
 

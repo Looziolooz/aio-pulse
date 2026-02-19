@@ -22,11 +22,6 @@ function err(message: string, status = 500) {
 }
 
 // ─── POST /api/monitoring ─────────────────────────────────────────────────────
-// Runs a monitoring check for a prompt across one or more AI engines.
-// Saves results, evaluates alert rules, and dispatches notifications.
-//
-// NOTE: Each engine run = 2 Gemini calls (simulate + analyze).
-//       Engines run in parallel but we cap at 3 to avoid rate limiting.
 export async function POST(req: NextRequest) {
   let userId: string
   try {
@@ -85,7 +80,7 @@ export async function POST(req: NextRequest) {
     return err('No valid engines specified', 400)
   }
 
-  // ── Fetch previous results for change detection ───────────────────────────
+  // ── Fetch previous results per change detection ───────────────────────────
   const { data: previousResults } = await db
     .from('monitoring_results')
     .select('*')
@@ -94,14 +89,20 @@ export async function POST(req: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(engines.length)
 
+  // ── FIX N+1: fetch alert rules UNA VOLTA sola prima del loop ─────────────
+  const { data: rules } = await db
+    .from('alert_rules')
+    .select('*')
+    .eq('brand_id', brand.id)
+    .eq('is_active', true)
+
   const results: MonitoringResult[] = []
   const errors: string[] = []
 
-  // ── Run engines in parallel (capped at 3 by schema validation) ────────────
+  // ── Run engines in parallel ───────────────────────────────────────────────
   await Promise.all(
     engines.map(async (engine) => {
       try {
-        // Truncate response_text before saving to prevent unbounded DB growth
         const resultData = await runMonitoringCheck(prompt as Prompt, brand, engine, userId)
         const truncatedData = {
           ...resultData,
@@ -125,13 +126,7 @@ export async function POST(req: NextRequest) {
 
         results.push(saved as MonitoringResult)
 
-        // ── Evaluate alert rules ────────────────────────────────────────────
-        const { data: rules } = await db
-          .from('alert_rules')
-          .select('*')
-          .eq('brand_id', brand.id)
-          .eq('is_active', true)
-
+        // ── Evaluate alert rules (usa rules già fetchate) ───────────────────
         if (rules && rules.length > 0) {
           const previousResult = (previousResults as MonitoringResult[])?.find(
             (r) => r.engine === engine,
@@ -154,11 +149,20 @@ export async function POST(req: NextRequest) {
                 .single()
 
               if (savedEvent) {
-                const channelsSent = await dispatchAlert(
-                  savedEvent as Parameters<typeof dispatchAlert>[0],
-                  rule,
-                  brand,
-                )
+                // FIX: log errori dispatchAlert invece di ignorarli silenziosamente
+                let channelsSent: string[] = []
+                try {
+                  channelsSent = await dispatchAlert(
+                    savedEvent as Parameters<typeof dispatchAlert>[0],
+                    rule,
+                    brand,
+                  )
+                } catch (dispatchErr) {
+                  console.error(
+                    `[monitoring] dispatchAlert failed for rule ${rule.id}:`,
+                    dispatchErr,
+                  )
+                }
 
                 await db
                   .from('alert_events')
@@ -234,11 +238,6 @@ export async function POST(req: NextRequest) {
 }
 
 // ─── GET /api/monitoring ──────────────────────────────────────────────────────
-// Returns paginated monitoring results.
-// ?brand_id=uuid   → filter by brand
-// ?engine=chatgpt  → filter by engine
-// ?limit=50        → page size (max 100)
-// ?page=1          → page number
 export async function GET(req: NextRequest) {
   let userId: string
   try {
