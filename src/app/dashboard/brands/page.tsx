@@ -32,11 +32,18 @@ function BrandCard({ brand, onDelete }: { brand: Brand; onDelete: (id: string) =
     setDeleting(true)
     try {
       const res = await fetch(`/api/brands/${brand.id}`, { method: 'DELETE' })
-      const json = (await res.json()) as { success: boolean; message?: string }
+      
+      if (!res.ok) {
+        throw new Error(`Delete failed with status: ${res.status}`)
+      }
+
+      const json = await res.json()
       if (!json.success) throw new Error(json.message)
+      
       onDelete(brand.id)
       toast.success(`"${brand.name}" deleted`)
     } catch (err) {
+      console.error('[BrandCard] Delete error:', err)
       toast.error(err instanceof Error ? err.message : 'Delete failed')
     } finally {
       setDeleting(false)
@@ -53,8 +60,8 @@ function BrandCard({ brand, onDelete }: { brand: Brand; onDelete: (id: string) =
           >
             {brand.name.charAt(0).toUpperCase()}
           </div>
-          <div>
-            <h3 className="font-bold text-white">{brand.name}</h3>
+          <div className="min-w-0">
+            <h3 className="truncate font-bold text-white">{brand.name}</h3>
             {brand.domain && (
               <a
                 className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300"
@@ -62,7 +69,8 @@ function BrandCard({ brand, onDelete }: { brand: Brand; onDelete: (id: string) =
                 rel="noopener noreferrer"
                 target="_blank"
               >
-                <Globe className="h-3 w-3" /> {brand.domain}
+                <Globe className="h-3 w-3" /> 
+                <span className="truncate">{brand.domain}</span>
               </a>
             )}
           </div>
@@ -144,13 +152,28 @@ export default function BrandsPage() {
 
   const loadBrands = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch('/api/brands')
-      const json = (await res.json()) as { success: boolean; data?: Brand[]; message?: string }
-      if (!json.success) throw new Error(json.message)
+      
+      // Robust response checking to avoid "Unexpected end of JSON input"
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`Server returned ${res.status}: ${text.slice(0, 50)}`)
+      }
+
+      const contentType = res.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Received non-JSON response from server. Check your API route.")
+      }
+
+      const json = await res.json()
+      if (!json.success) throw new Error(json.message || 'Failed to load brands')
+      
       setBrands(json.data ?? [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load brands')
+      console.error('[BrandsPage] Load error:', err)
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred while loading brands')
     } finally {
       setLoading(false)
     }
@@ -164,7 +187,8 @@ export default function BrandsPage() {
 
   return (
     <div className="animate-in space-y-8">
-      <div className="flex items-center justify-between">
+      {/* Header section with responsive alignment */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-white">Brands</h1>
           <p className="mt-1 text-gray-400">
@@ -172,7 +196,7 @@ export default function BrandsPage() {
           </p>
         </div>
         <Link href="/dashboard/brands/new">
-          <Button size="lg">
+          <Button size="lg" className="w-full sm:w-auto">
             <Plus className="h-5 w-5" /> New Brand
           </Button>
         </Link>
@@ -186,8 +210,11 @@ export default function BrandsPage() {
 
       {error && (
         <div className="flex items-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-4">
-          <AlertCircle className="h-5 w-5 text-red-400" />
+          <AlertCircle className="h-5 w-5 shrink-0 text-red-400" />
           <p className="text-sm text-red-300">{error}</p>
+          <Button size="sm" variant="ghost" className="ml-auto text-red-400" onClick={loadBrands}>
+            Retry
+          </Button>
         </div>
       )}
 
@@ -208,7 +235,7 @@ export default function BrandsPage() {
         </div>
       )}
 
-      {!loading && brands.length > 0 && (
+      {!loading && !error && brands.length > 0 && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           {brands.map((brand) => (
             <BrandCard key={brand.id} brand={brand} onDelete={handleDelete} />
