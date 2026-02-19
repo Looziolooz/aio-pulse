@@ -2,26 +2,32 @@
 import { createClient } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse } from 'next/server'
 
-const supabaseUrl = process.env['NEXT_PUBLIC_SUPABASE_URL']!
-const supabaseAnonKey = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']!
-const supabaseServiceKey = process.env['SUPABASE_SERVICE_KEY']!
+const supabaseUrl = process.env['NEXT_PUBLIC_SUPABASE_URL']
+const supabaseAnonKey = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']
+const supabaseServiceKey = process.env['SUPABASE_SERVICE_KEY']
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase env variables. Check your .env.local file.')
+// Verifichiamo la configurazione senza bloccare il processo di build su Vercel.
+// Se le chiavi mancano, logghiamo un avviso invece di lanciare un errore fatale.
+const isConfigured = !!supabaseUrl && !!supabaseAnonKey
+
+if (!isConfigured && process.env.NODE_ENV === 'production') {
+  console.warn('⚠️ Warning: Supabase environment variables are missing in production.')
 }
 
 // ─── Browser client (anon key, RLS enabled) ───────────────────────────────────
-// Import this in client components and browser-side code only.
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: { persistSession: true, autoRefreshToken: true },
-})
+// Inizializzato con valori placeholder se mancano le chiavi per evitare crash durante il pre-rendering.
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder',
+  {
+    auth: { persistSession: true, autoRefreshToken: true },
+  },
+)
 
 // ─── Server client (service key, bypasses RLS) ────────────────────────────────
-// Import ONLY inside API routes (src/app/api/**).
-// Never use in client components — the service key must never reach the browser.
 export function createServerClient() {
-  if (!supabaseServiceKey) {
-    throw new Error('SUPABASE_SERVICE_KEY is not set. Add it to .env.local')
+  if (!supabaseServiceKey || !supabaseUrl) {
+    throw new Error('SUPABASE_SERVICE_KEY or URL is not set. Check your environment variables.')
   }
   return createClient(supabaseUrl, supabaseServiceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -29,8 +35,6 @@ export function createServerClient() {
 }
 
 // ─── AuthError ────────────────────────────────────────────────────────────────
-// Thrown by getCurrentUserId when auth fails.
-// withAuthError() catches this and returns the correct HTTP 401 response.
 export class AuthError extends Error {
   constructor(
     message: string,
@@ -42,32 +46,14 @@ export class AuthError extends Error {
 }
 
 // ─── getCurrentUserId ─────────────────────────────────────────────────────────
-//
-// Returns the authenticated user ID for an API route request.
-//
-// ╔═══════════════════════════════════════════════════════════════╗
-// ║  DEVELOPMENT MODE (local)                                     ║
-// ║  Set DEV_USER_ID=any-string in .env.local                     ║
-// ║  → Auth is skipped, that string is always returned.           ║
-// ║  Remove DEV_USER_ID before deploying to production.           ║
-// ╠═══════════════════════════════════════════════════════════════╣
-// ║  PRODUCTION MODE                                              ║
-// ║  The client must send: Authorization: Bearer <supabase_jwt>   ║
-// ║  → JWT is verified against your Supabase project secret.      ║
-// ║  → Real user ID (UUID) is returned.                           ║
-// ╚═══════════════════════════════════════════════════════════════╝
-//
-// Usage in every API route:
-//   const userId = await getCurrentUserId(req.headers.get('authorization'))
-//
 export async function getCurrentUserId(authHeader?: string | null): Promise<string> {
-  // ── Dev shortcut ──────────────────────────────────────────────────────────
+  // ── Dev shortcut (solo se DEV_USER_ID è esplicitamente impostato in .env) ──
   const devId = process.env['DEV_USER_ID']
   if (devId && devId.trim().length > 0) {
     return devId.trim()
   }
 
-  // ── Production: extract and verify JWT ───────────────────────────────────
+  // ── Production: estrazione e verifica del JWT ─────────────────────────────
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw new AuthError('Missing or malformed Authorization header', 401)
   }
@@ -77,7 +63,7 @@ export async function getCurrentUserId(authHeader?: string | null): Promise<stri
     throw new AuthError('Empty bearer token', 401)
   }
 
-  // supabase.auth.getUser() validates the JWT signature server-side.
+  // supabase.auth.getUser(token) valida la firma del JWT lato server.
   const { data, error } = await supabase.auth.getUser(token)
   if (error || !data.user) {
     throw new AuthError('Invalid or expired token', 401)
@@ -87,17 +73,11 @@ export async function getCurrentUserId(authHeader?: string | null): Promise<stri
 }
 
 // ─── withAuthError ────────────────────────────────────────────────────────────
-// Wraps an API route handler so AuthError is converted to a 401 JSON response
-// automatically, instead of crashing with a 500.
-//
-// Usage (optional but recommended):
-//
-//   export const GET = withAuthError(async (req) => {
-//     const userId = await getCurrentUserId(req.headers.get('authorization'))
-//     // ... your logic
-//   })
-//
-type RouteHandler = (req: NextRequest, ctx?: unknown) => Promise<NextResponse>
+interface RouteContext {
+  params: Record<string, string | string[] | undefined>
+}
+
+type RouteHandler = (req: NextRequest, ctx: RouteContext) => Promise<NextResponse>
 
 export function withAuthError(handler: RouteHandler): RouteHandler {
   return async (req, ctx) => {
@@ -110,13 +90,16 @@ export function withAuthError(handler: RouteHandler): RouteHandler {
           { status: err.statusCode },
         )
       }
-      throw err
+      console.error('[Unhandled API Error]:', err)
+      return NextResponse.json(
+        { success: false, message: 'An unexpected error occurred' },
+        { status: 500 },
+      )
     }
   }
 }
 
 // ─── getDevUserId ─────────────────────────────────────────────────────────────
-// Convenience helper used only in seed scripts and tests.
 export function getDevUserId(): string {
   return process.env['DEV_USER_ID'] ?? 'dev-user-local-001'
 }
